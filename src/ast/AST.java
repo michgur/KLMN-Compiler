@@ -1,6 +1,6 @@
 package ast;
 
-import lex.TokenInputStream;
+import lex.TokenStream;
 
 /**
  * ಠ^ಠ.
@@ -8,7 +8,7 @@ import lex.TokenInputStream;
  */
 public abstract class AST
 {
-    public static AST parse(TokenInputStream tokens) {
+    public static AST parse(TokenStream tokens) {
         return null;
     }
 }

@@ -1,4 +1,4 @@
-import lex.TokenInputStream;
+import lex.TokenStream;
 
 /**
  * ಠ^ಠ.
@@ -7,7 +7,8 @@ import lex.TokenInputStream;
 public class Main
 {
     public static void main(String[] args) {
-        String code = "x = 233 *    456";
-        new TokenInputStream(code);
+        String code = "xavier () {= 233 *  bona89 _sk__  456}";
+        TokenStream t = new TokenStream(code);
+        t.forEachRemaining(token -> System.out.println(token.getType() + " " + token.getValue()));
     }
 }
