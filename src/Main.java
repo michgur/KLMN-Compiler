@@ -1,4 +1,4 @@
-import ast.Grammar;
+import parsing.Grammar;
 import lex.Token;
 
 /**
@@ -25,6 +25,6 @@ public class Main
         g.addProduction(Y, m, T);
         g.addProduction(Y, Grammar.EPSILON);
 
-        System.out.println(g.followSet(cp));
+        System.out.println(g.followSet(i));
     }
 }
