@@ -23,13 +23,16 @@ public class Grammar
         symbols.add(s);
         return s;
     }
-    public Terminal addTerminal(String name, Token.Type type) { return addTerminal(name, type, ""); }
-    public Terminal addTerminal(String name, Token.Type type, String value) {
-        Terminal t = new Terminal(name, new Token(type, value));
+    public Terminal addTerminal(String name, Token.Type type) {
+        Terminal t = new Terminal(name, type);
         symbols.add(t);
         return t;
     }
     public void setStart(Symbol s) { start = s; }
+    public Symbol getStart() { return start; }
+
+    public Set<Symbol> getSymbols() { return symbols; }
+    public HashMap<Symbol, Set<Symbol[]>> getProductions() { return productions; }
 
     // ---Do NOT call these functions before fully defining the grammar--- (fixme)
     private HashMap<Symbol, Set<Symbol>> firstSets = new HashMap<>();
@@ -54,6 +57,15 @@ public class Grammar
                 if (i == 0 || set.contains(EPSILON)) first.addAll(set = firstSet(p[i]));
                 else break;
             }
+        }
+        return first;
+    }
+    public Set<Symbol> firstSet(Symbol[] s) {
+        Set<Symbol> first = new HashSet<>();
+        for (int i = 0; i < s.length; i++) {
+            Set<Symbol> t = firstSet(s[i]);
+            first.addAll(t);
+            if (!t.contains(EPSILON)) break;
         }
         return first;
     }
@@ -87,7 +99,7 @@ public class Grammar
         productions.get(s).add(production);
     }
 
-    public static final Symbol EPSILON = new Symbol("ε"), END = new Symbol("$");
+    public static final Symbol EPSILON = new Symbol("ε"), END = new Terminal("$", Token.Type.END);
 
     public static class Symbol {
         private String name;
@@ -95,10 +107,12 @@ public class Grammar
         @Override public String toString() { return name; }
     }
     public static class Terminal extends Symbol {
-        private Token value;
-        private Terminal(String name, Token value) {
+        private Token.Type value;
+        private Terminal(String name, Token.Type value) {
             super(name);
             this.value = value;
         }
+
+        public Token.Type getValue() { return value; }
     }
 }

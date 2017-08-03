@@ -6,7 +6,17 @@ package lex;
  */
 public class Token
 {
-    public enum Type { IDENTIFIER, NUMBER, STRING, PUNCTUATION, OPERATOR, KEYWORD }
+    public enum Type {
+        IDENTIFIER,
+        NUMBER,
+        STRING,
+        OPEN_PAREN,
+        CLOSE_PAREN,
+        PLUS,
+        TIMES,
+        END,
+        KEYWORD
+    }
 
     private Type type;
     private String value;

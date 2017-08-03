@@ -9,17 +9,15 @@ import java.util.function.Consumer;
  */
 public class TokenStream implements Iterator<Token>  // todo: create specialized exception for lexing
 {
+    public static final Token END = new Token(Token.Type.END, "$");
+
     private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
         "if", "else", "for", "while", "true", "false"
-    ));
-    private static final Set<Character> PUNCTUATIONS = new HashSet<>(Arrays.asList(
-            ';', '[', ']', ')', '(', '{', '}', ','
-    )), OPERATORS = new HashSet<>(Arrays.asList(
-            '=', '!', '+', '-', '/', '*', '%', '&', '|', '<', '>'
     ));
     
     private String code;
     private int index, length;
+    private boolean end = false;
 
     private Token next = null;
 
@@ -46,9 +44,13 @@ public class TokenStream implements Iterator<Token>  // todo: create specialized
     public void forEachRemaining(Consumer<? super Token> action) { while (hasNext()) action.accept(next()); }
 
     @Override
-    public boolean hasNext() {  return index < length; }
+    public boolean hasNext() { return !end; }
 
     private Token readNext() {
+        if (index >= length) {
+            end = true;
+            return END;
+        }
         char c = code.charAt(index);
 
         if (Character.isSpaceChar(c)) {
@@ -60,8 +62,11 @@ public class TokenStream implements Iterator<Token>  // todo: create specialized
         if (c == '"') return readString();
 
         index++;
-        if (PUNCTUATIONS.contains(c)) return new Token(Token.Type.PUNCTUATION, "" + c);
-        if (OPERATORS.contains(c)) return new Token(Token.Type.OPERATOR, "" + c);
+        if (c == '+') return new Token(Token.Type.PLUS, c + "");
+        if (c == '(') return new Token(Token.Type.OPEN_PAREN, c + "");
+        if (c == ')') return new Token(Token.Type.CLOSE_PAREN, c + "");
+        if (c == '*') return new Token(Token.Type.TIMES, c + "");
+
 
         throw new RuntimeException("Error: Can't Handle Char " + c + " at " + index);
     }
@@ -75,10 +80,10 @@ public class TokenStream implements Iterator<Token>  // todo: create specialized
     }
 
     private Token readNumber() {
-        StringBuilder value = new StringBuilder().append(code.charAt(index++));
+        StringBuilder value = new StringBuilder().append(code.charAt(index));
         boolean dot = false;
-        while (index < length) {
-            char c = code.charAt(index++);
+        while (++index < length) {
+            char c = code.charAt(index);
             if (c == '.' && !dot) {
                 dot = true;
                 value.append('.');
