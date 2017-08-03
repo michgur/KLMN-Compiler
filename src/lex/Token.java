@@ -20,5 +20,10 @@ public class Token
     public String getValue() { return value; }
 
     @Override
+    public boolean equals(Object other) {
+        return other instanceof Token && ((Token) other).type == type && ((Token) other).value.equals(value);
+    }
+
+    @Override
     public String toString() { return "Token: " + type + "(\"" + value + "\")"; }
 }

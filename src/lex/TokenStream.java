@@ -21,6 +21,8 @@ public class TokenStream implements Iterator<Token>  // todo: create specialized
     private String code;
     private int index, length;
 
+    private Token next = null;
+
     public TokenStream(String code) {
         this.code = code;
 
@@ -28,8 +30,25 @@ public class TokenStream implements Iterator<Token>  // todo: create specialized
         index = 0;
     }
 
+    public Token peek() {
+        if (next == null) next = readNext();
+        return next;
+    }
+
     @Override
     public Token next() {
+        Token n = (next != null) ? next : readNext();
+        next = null;
+        return n;
+    }
+
+    @Override
+    public void forEachRemaining(Consumer<? super Token> action) { while (hasNext()) action.accept(next()); }
+
+    @Override
+    public boolean hasNext() {  return index < length; }
+
+    private Token readNext() {
         char c = code.charAt(index);
 
         if (Character.isSpaceChar(c)) {
@@ -46,12 +65,6 @@ public class TokenStream implements Iterator<Token>  // todo: create specialized
 
         throw new RuntimeException("Error: Can't Handle Char " + c + " at " + index);
     }
-
-    @Override
-    public void forEachRemaining(Consumer<? super Token> action) { while (hasNext()) action.accept(next()); }
-
-    @Override
-    public boolean hasNext() {  return index < length; }
 
     private Token readString() {
         int end = code.indexOf('"', index + 1);
