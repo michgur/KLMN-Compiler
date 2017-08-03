@@ -7,7 +7,7 @@ import lex.TokenStream;
 public class Main
 {
     public static void main(String[] args) {
-        String code = "xavier () {= 233 *  bona89 _sk__  456}";
+        String code = "12 * (34 + 2.2)";
         TokenStream t = new TokenStream(code);
         t.forEachRemaining(token -> System.out.println(token.getType() + " " + token.getValue()));
     }

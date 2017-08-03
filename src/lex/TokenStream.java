@@ -7,12 +7,12 @@ import java.util.function.Consumer;
  * ಠ^ಠ.
  * Created by Michael on 8/2/2017.
  */
-public class TokenStream implements Iterator<Token>
+public class TokenStream implements Iterator<Token>  // todo: create specialized exception for lexing
 {
-    public static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
+    private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
         "if", "else", "for", "while", "true", "false"
     ));
-    public static final Set<Character> PUNCTUATIONS = new HashSet<>(Arrays.asList(
+    private static final Set<Character> PUNCTUATIONS = new HashSet<>(Arrays.asList(
             ';', '[', ']', ')', '(', '{', '}', ','
     )), OPERATORS = new HashSet<>(Arrays.asList(
             '=', '!', '+', '-', '/', '*', '%', '&', '|', '<', '>'
@@ -36,9 +36,9 @@ public class TokenStream implements Iterator<Token>
             index++;
             return next();
         }
-        if (Character.isLetter(c) || c == '_') return getIdentifier();
-        if (Character.isDigit(c)) return getNumber();
-        if (c == '"') return getString();
+        if (Character.isLetter(c) || c == '_') return readIdentifier();
+        if (Character.isDigit(c)) return readNumber();
+        if (c == '"') return readString();
 
         index++;
         if (PUNCTUATIONS.contains(c)) return new Token(Token.Type.PUNCTUATION, "" + c);
@@ -53,7 +53,7 @@ public class TokenStream implements Iterator<Token>
     @Override
     public boolean hasNext() {  return index < length; }
 
-    private Token getString() {
+    private Token readString() {
         int end = code.indexOf('"', index + 1);
         if (end == -1) throw new RuntimeException("Lexing Error String Blah Blah Blah");
         String value = code.substring(index, end);
@@ -61,7 +61,7 @@ public class TokenStream implements Iterator<Token>
         return new Token(Token.Type.STRING, value);
     }
 
-    private Token getNumber() {
+    private Token readNumber() {
         StringBuilder value = new StringBuilder().append(code.charAt(index++));
         boolean dot = false;
         while (index < length) {
@@ -76,7 +76,7 @@ public class TokenStream implements Iterator<Token>
         return new Token(Token.Type.NUMBER, value.toString());
     }
 
-    private Token getIdentifier() {
+    private Token readIdentifier() {
         StringBuilder value = new StringBuilder().append(code.charAt(index++));
         while (index < length) {
             char c = code.charAt(index++);

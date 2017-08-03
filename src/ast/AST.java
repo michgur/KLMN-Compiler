@@ -8,7 +8,11 @@ import lex.TokenStream;
  */
 public abstract class AST
 {
+    private AST[] children;
+
     public static AST parse(TokenStream tokens) {
+
+
         return null;
     }
 }
