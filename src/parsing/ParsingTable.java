@@ -65,14 +65,34 @@ public class ParsingTable // LL(1) Parsing Table
 
     @Override
     public String toString() {
-        StringBuilder s = new StringBuilder().append('\t');
-        for (Symbol symbol : terminals) s.append(symbol).append('\t');
+        int[] columns = new int[terminals.size()];
+        for (int col = 0; col < columns.length; col++) {
+            columns[col] = 3;
+            for (int row = 0, l = 0; row < nonTerminals.size(); row++, l = 0) {
+                if (table[row][col] == null) continue;
+
+                for (Symbol c : table[row][col]) l += c.toString().length();
+                if (l > columns[col]) columns[col] = l;
+            }
+        }
+
+        int firstCol = 1;
+        for (Symbol s : nonTerminals) if (s.toString().length() > firstCol) firstCol = s.toString().length();
+
+        StringBuilder s = new StringBuilder().append(String.join("", Collections.nCopies(firstCol, " "))).append('|');
+        for (int i = 0; i < terminals.size(); i++)
+            s.append(String.format("%1$" + columns[i] + "s", terminals.get(i))).append('|');
+
         for (int i = 0; i < table.length; i++) {
-            s.append('\n').append(nonTerminals.get(i)).append('\t');
+            s.append('\n').append(String.format("%1$" + firstCol + "s", nonTerminals.get(i))).append('|');
             for (int j = 0; j < table[i].length; j++) {
-                if (table[i][j] == null) s.append("----");
-                else for (Symbol symbol : table[i][j]) s.append(symbol);
-                s.append('\t');
+                if (table[i][j] == null) s.append(String.join("", Collections.nCopies(columns[j], " ")));
+                else {
+                    StringBuilder p = new StringBuilder();
+                    for (Symbol symbol : table[i][j]) p.append(symbol);
+                    s.append(String.format("%1$" + columns[j] + "s", p.toString()));
+                }
+                s.append("|");
             }
         }
         return s.toString();
