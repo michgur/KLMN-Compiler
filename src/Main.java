@@ -1,7 +1,6 @@
 import lex.TokenStream;
-import parsing.Grammar;
+import parsing.*;
 import lex.Token;
-import parsing.ParsingTable;
 
 /**
  * ಠ^ಠ.
@@ -10,36 +9,28 @@ import parsing.ParsingTable;
 public class Main
 {
     public static void main(String[] args) {
-        String code = "(1 + 2) * 3";
+        String code = "3 * (1 + 2)";
         TokenStream t = new TokenStream(code);
 
-        Grammar g = new Grammar();
-        Grammar.Symbol E = g.addSymbol("E"), T = g.addSymbol("T"), X = g.addSymbol("X"), Y = g.addSymbol("Y");
-        Grammar.Terminal i = g.addTerminal("int", Token.Type.NUMBER), op = g.addTerminal("(", Token.Type.OPEN_PAREN),
-                cp = g.addTerminal(")", Token.Type.CLOSE_PAREN), p = g.addTerminal("+", Token.Type.PLUS),
-                m = g.addTerminal("*", Token.Type.TIMES);
-        g.setStart(E);
-        g.addProduction(E, T, X);
-        g.addProduction(T, op, E, cp);
-        g.addProduction(T, i, Y);
-        g.addProduction(X, p, E);
-        g.addProduction(X, Grammar.EPSILON);
-        g.addProduction(Y, m, T);
-        g.addProduction(Y, Grammar.EPSILON);
-        g.generateFollowSets();
+        Symbol E = new Symbol("E"), T = new Symbol("T"), X = new Symbol("X"), Y = new Symbol("Y");
+        Terminal num = new Terminal("int", Token.Type.NUMBER), open = new Terminal("(", Token.Type.OPEN_PAREN),
+                close = new Terminal(")", Token.Type.CLOSE_PAREN), plus = new Terminal("+", Token.Type.PLUS),
+                mul = new Terminal("*", Token.Type.TIMES);
 
-        System.out.println(g.followSet(E));
-        System.out.println(g.followSet(X));
-        System.out.println(g.followSet(T));
-        System.out.println(g.followSet(Y));
-        System.out.println(g.followSet(op));
-        System.out.println(g.followSet(cp));
-        System.out.println(g.followSet(p));
-        System.out.println(g.followSet(m));
-        System.out.println(g.followSet(i));
+        E.addProduction(T, X);
+        T.addProduction(open, E, close);
+        T.addProduction(num, Y);
+        X.addProduction(plus, E);
+        X.addProduction(Symbol.EPSILON);
+        Y.addProduction(mul, T);
+        Y.addProduction(Symbol.EPSILON);
 
-//        ParsingTable table = new ParsingTable(g);
-//        table.parse(t);
-//        t.forEachRemaining(System.out::println);
+        Grammar g = new Grammar(E);
+
+        System.out.println(g);
+
+        ParsingTable table = new ParsingTable(g);
+        System.out.println(table);
+        table.parse(t);
     }
 }

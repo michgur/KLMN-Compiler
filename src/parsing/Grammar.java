@@ -1,125 +1,112 @@
 package parsing;
 
-import lex.Token;
-
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
+import static parsing.Terminal.*;
+
 /**
  * ಠ^ಠ.
- * Created by Michael on 8/3/2017.
+ * Created by Michael on 8/4/2017.
  */
 public class Grammar
 {
     private Set<Symbol> symbols = new HashSet<>();
-    private HashMap<Symbol, Set<Symbol[]>> productions = new HashMap<>();
-
     private Symbol start = null;
 
-    public Symbol addSymbol(String name) {
-        Symbol s = new Symbol(name);
-        symbols.add(s);
-        return s;
+    private HashMap<Symbol, Set<Symbol>> firstSets = new HashMap<>(), followSets = new HashMap<>();
+
+    public Grammar(Symbol start) {
+        this.start = start;
+        add(start);
+
+        symbols.forEach(this::generateFirstSet);
+        generateFollowSets();
+
+        symbols.remove(EPSILON);
     }
-    public Terminal addTerminal(String name, Token.Type type) {
-        Terminal t = new Terminal(name, type);
-        symbols.add(t);
-        return t;
-    }
-    public void setStart(Symbol s) { start = s; }
-    public Symbol getStart() { return start; }
 
     public Set<Symbol> getSymbols() { return symbols; }
-    public HashMap<Symbol, Set<Symbol[]>> getProductions() { return productions; }
+    public Symbol getStartSymbol() { return start; }
 
-    // ---Do NOT call these functions before fully defining the grammar--- (fixme)
-    private HashMap<Symbol, Set<Symbol>> firstSets = new HashMap<>();
-    public Set<Symbol> firstSet(Symbol s) {
-        if (firstSets.putIfAbsent(s, new HashSet<>()) != null) return firstSets.get(s);
+    public Set<Symbol> firstSet(Symbol symbol) { return firstSets.get(symbol); }
+    public Set<Symbol> followSet(Symbol symbol) { return followSets.get(symbol); }
 
-        Set<Symbol> first = firstSets.get(s);
-        if (s instanceof Terminal || s == EPSILON) { first.add(s); return first; }
-        for (Symbol[] p : productions.get(s)) {
-            if (p[0] == EPSILON) first.add(EPSILON);
-            else {
-                boolean eps = true;
-                for (Symbol c : p)
-                    if (!firstSet(c).contains(EPSILON)) {
-                        eps = false;
-                        break;
-                    }
-                if (eps) first.add(EPSILON);
-            }
-            Set<Symbol> set = null;
-            for (int i = 0; i < p.length; i++) {
-                if (i == 0 || set.contains(EPSILON)) first.addAll(set = firstSet(p[i]));
-                else break;
-            }
-        }
-        return first;
+    private void add(Symbol symbol) {
+        symbol.used = true;
+        for (Symbol[] rule : symbol.getProductions())
+            for (Symbol child : rule) if (symbols.add(child)) add(child);
     }
+
     public Set<Symbol> firstSet(Symbol[] s) {
         Set<Symbol> first = new HashSet<>();
-        for (int i = 0; i < s.length; i++) {
-            Set<Symbol> t = firstSet(s[i]);
+        for (Symbol value : s) {
+            Set<Symbol> t = firstSet(value);
             first.addAll(t);
             if (!t.contains(EPSILON)) break;
         }
         return first;
     }
 
-    private HashMap<Symbol, Set<Symbol>> followSets = new HashMap<>();
-    public Set<Symbol> followSet(Symbol s) { return followSets.get(s); }
+    private Set<Symbol> generateFirstSet(Symbol symbol) {
+        if (firstSets.putIfAbsent(symbol, new HashSet<>()) != null) return firstSets.get(symbol);
 
-    public void generateFollowSets() {
+        if (symbol.isTerminal() || symbol == EPSILON) {
+            firstSets.get(symbol).add(symbol);
+            return firstSets.get(symbol);
+        }
+        for (Symbol[] rule : symbol.getProductions()) {
+            int i = 0;
+            for (; i < rule.length; i++)
+                if (!generateFirstSet(rule[i]).contains(EPSILON)) break;
+            if (i == rule.length) firstSets.get(symbol).add(EPSILON);
+            else firstSets.get(symbol).addAll(firstSet(rule[i]));
+        }
+        return firstSets.get(symbol);
+    }
+
+    private void generateFollowSets() {
         symbols.forEach(s -> followSets.put(s, new HashSet<>()));
-        followSets.get(start).add(END);
+        followSets.get(start).add(END_OF_INPUT);
 
         boolean change = true;
         while (change) {
             change = false;
-            for (Symbol key : productions.keySet())
-                for (Symbol[] p : productions.get(key)) {
+            for (Symbol symbol : symbols)
+                for (Symbol[] rule : symbol.getProductions()) {
                     boolean end = true; // whether the current symbol in iteration can appear at the end of the production
                     Set<Symbol> first = new HashSet<>(); // first set of all symbols that come after each symbol in iteration
-                    for (int i = p.length - 1; i >= 0; i--) {
-                        if (p[i] == EPSILON) continue;
-                        if (end && followSets.get(p[i]).addAll(followSets.get(key))) change = true;
+                    for (int i = rule.length - 1; i >= 0; i--) {
+                        if (rule[i] == EPSILON) continue;
+                        if (end && followSets.get(rule[i]).addAll(followSets.get(symbol))) change = true;
 
-                        if (followSets.get(p[i]).addAll(first)) change = true;
-                        if (!firstSet(p[i]).contains(EPSILON)) {
+                        if (followSets.get(rule[i]).addAll(first)) change = true;
+                        if (!firstSet(rule[i]).contains(EPSILON)) {
                             end = false;
                             first.clear();
                         }
-                        first.addAll(firstSet(p[i]));
+                        first.addAll(firstSet(rule[i]));
                     }
                 }
         }
         followSets.values().forEach(s -> s.remove(EPSILON));
     }
-    // -------------------------------------------------------------------
 
-    public void addProduction(Symbol s, Symbol... production) {
-        productions.putIfAbsent(s, new HashSet<>());
-        productions.get(s).add(production);
-    }
+    @Override
+    public String toString() {
+        StringBuilder s = new StringBuilder();
+        for (Symbol symbol : symbols) {
+            if (symbol.isTerminal()) continue;
 
-    public static final Symbol EPSILON = new Symbol("ε"), END = new Terminal("$", Token.Type.END);
-
-    public static class Symbol {
-        private String name;
-        Symbol(String name) { this.name = name; }
-        @Override public String toString() { return name; }
-    }
-    public static class Terminal extends Symbol {
-        private Token.Type value;
-        private Terminal(String name, Token.Type value) {
-            super(name);
-            this.value = value;
+            s.append(symbol).append(" -> ");
+            for (Symbol[] rule : symbol.getProductions()) {
+                for (Symbol child : rule) s.append(child);
+                s.append(" | ");
+            }
+            s.delete(s.length() - 3, s.length() - 1);
+            s.append('\n');
         }
-
-        public Token.Type getValue() { return value; }
+        return s.toString();
     }
 }
