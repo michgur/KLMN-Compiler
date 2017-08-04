@@ -71,26 +71,33 @@ public class Grammar
     }
 
     private HashMap<Symbol, Set<Symbol>> followSets = new HashMap<>();
-    public Set<Symbol> followSet(Symbol s) {
-        if (followSets.putIfAbsent(s, new HashSet<>()) != null) return followSets.get(s);
+    public Set<Symbol> followSet(Symbol s) { return followSets.get(s); }
 
-        Set<Symbol> follow = followSets.get(s);
-        if (s == start) follow.add(END);
-        for (Symbol symbol : productions.keySet())
-            for (Symbol[] p : productions.get(symbol)) {
-                int i = Arrays.asList(p).indexOf(s);
-                if (i == -1) continue;
+    public void generateFollowSets() {
+        symbols.forEach(s -> followSets.put(s, new HashSet<>()));
+        followSets.get(start).add(END);
 
-                while (++i < p.length) {
-                    Set<Symbol> first = firstSet(p[i]);
-                    follow.addAll(first);
-                    if (!first.contains(EPSILON)) break;
+        boolean change = true;
+        while (change) {
+            change = false;
+            for (Symbol key : productions.keySet())
+                for (Symbol[] p : productions.get(key)) {
+                    boolean end = true; // whether the current symbol in iteration can appear at the end of the production
+                    Set<Symbol> first = new HashSet<>(); // first set of all symbols that come after each symbol in iteration
+                    for (int i = p.length - 1; i >= 0; i--) {
+                        if (p[i] == EPSILON) continue;
+                        if (end && followSets.get(p[i]).addAll(followSets.get(key))) change = true;
+
+                        if (followSets.get(p[i]).addAll(first)) change = true;
+                        if (!firstSet(p[i]).contains(EPSILON)) {
+                            end = false;
+                            first.clear();
+                        }
+                        first.addAll(firstSet(p[i]));
+                    }
                 }
-                if (i == p.length) follow.addAll(followSet(symbol));
-            }
-
-        follow.remove(EPSILON);
-        return follow;
+        }
+        followSets.values().forEach(s -> s.remove(EPSILON));
     }
     // -------------------------------------------------------------------
 

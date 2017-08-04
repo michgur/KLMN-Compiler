@@ -26,18 +26,10 @@ public class Main
         g.addProduction(X, Grammar.EPSILON);
         g.addProduction(Y, m, T);
         g.addProduction(Y, Grammar.EPSILON);
+        g.generateFollowSets();
 
-        System.out.println(g.firstSet(X));
-        System.out.println(g.firstSet(E));
-        System.out.println(g.firstSet(T));
-        System.out.println(g.firstSet(Y));
-        System.out.println(g.firstSet(op));
-        System.out.println(g.firstSet(cp));
-        System.out.println(g.firstSet(p));
-        System.out.println(g.firstSet(m));
-        System.out.println(g.firstSet(i));
-        System.out.println(g.followSet(X));
         System.out.println(g.followSet(E));
+        System.out.println(g.followSet(X));
         System.out.println(g.followSet(T));
         System.out.println(g.followSet(Y));
         System.out.println(g.followSet(op));
@@ -46,8 +38,8 @@ public class Main
         System.out.println(g.followSet(m));
         System.out.println(g.followSet(i));
 
-        ParsingTable table = new ParsingTable(g);
-        table.parse(t);
+//        ParsingTable table = new ParsingTable(g);
+//        table.parse(t);
 //        t.forEachRemaining(System.out::println);
     }
 }
