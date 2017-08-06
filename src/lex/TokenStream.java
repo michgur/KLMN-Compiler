@@ -7,7 +7,7 @@ import java.util.function.Consumer;
  * ಠ^ಠ.
  * Created by Michael on 8/2/2017.
  */
-public class TokenStream implements Iterator<Token>  // todo: create specialized exception for lexing
+public class TokenStream implements Iterator<Token>
 {
     public static final Token END = new Token(Token.Type.END, "$");
 

@@ -1,5 +1,7 @@
 package parsing;
 
+import lex.Token;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -24,6 +26,7 @@ public class Symbol
     Set<Symbol[]> getProductions() { return productions; }
 
     public boolean isTerminal() { return false; }
+    public boolean matches(Token t) { throw new IllegalStateException("Symbol " + name + " is Not a Terminal, Cannot Match Tokens"); }
 
     @Override
     public String toString() { return name; }

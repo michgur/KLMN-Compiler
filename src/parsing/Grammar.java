@@ -104,9 +104,9 @@ public class Grammar
                 for (Symbol child : rule) s.append(child);
                 s.append(" | ");
             }
-            s.delete(s.length() - 3, s.length() - 1);
+            s.delete(s.length() - 3, s.length());
             s.append('\n');
         }
-        return s.toString();
+        return s.deleteCharAt(s.length() - 1).toString();
     }
 }

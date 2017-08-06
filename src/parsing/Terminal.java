@@ -17,8 +17,8 @@ public class Terminal extends Symbol
         this.type = type;
     }
 
-    public Token.Type getType() { return type; }
-
     @Override
     public boolean isTerminal() { return true; }
+    @Override
+    public boolean matches(Token t) { return t.getType() == type; }
 }

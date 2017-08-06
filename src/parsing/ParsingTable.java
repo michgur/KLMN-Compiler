@@ -1,6 +1,6 @@
 package parsing;
 
-import lex.Token;
+import javafx.util.Pair;
 import lex.TokenStream;
 
 import java.util.*;
@@ -14,64 +14,72 @@ import static parsing.Terminal.*;
 public class ParsingTable // LL(1) Parsing Table
 {
     private Grammar grammar;
-    private Symbol[][][] table;
-    private List<Symbol> terminals = new ArrayList<>(), nonTerminals = new ArrayList<>();
-    public ParsingTable(Grammar g) {
-        grammar = g;
-        for (Symbol s : g.getSymbols()) {
-            if (s.isTerminal()) terminals.add(s);
-            else nonTerminals.add(s);
-        }
-        terminals.add(END_OF_INPUT);
-        table = new Symbol[nonTerminals.size()][terminals.size()][];
+    private Map<Pair<Symbol, Terminal>, Symbol[]> map = new HashMap<>();
 
-        for (Symbol s : g.getSymbols())
+    public ParsingTable(Grammar grammar) {
+        this.grammar = grammar;
+        for (Symbol s : grammar.getSymbols())
             for (Symbol[] p : s.getProductions()) {
                 Set<Symbol> set = new HashSet<>();
-                set.addAll(g.firstSet(p));
-                if (set.contains(EPSILON)) set.addAll(g.followSet(s));
+                set.addAll(grammar.firstSet(p));
+                if (set.contains(EPSILON)) set.addAll(grammar.followSet(s));
                 for (Symbol symbol : set)
-                    if (symbol.isTerminal() || symbol == END_OF_INPUT) set(s, symbol, p);
+                    if (symbol.isTerminal()) map.put(new Pair<>(s, (Terminal) symbol), p);
             }
     }
 
-    public Symbol[] get(Symbol s, Token t) {
-        for (int i = 0; i < terminals.size(); i++)
-            if (((Terminal) terminals.get(i)).getType() == t.getType()) return table[nonTerminals.indexOf(s)][i];
-        throw new RuntimeException();
-    }
-    public Symbol[] get(Symbol s, Symbol t) { return table[nonTerminals.indexOf(s)][terminals.indexOf(t)]; }
-    public void set(Symbol s, Symbol t, Symbol[] v) { table[nonTerminals.indexOf(s)][terminals.indexOf(t)] = v; }
+    public ParseTree parse(TokenStream tokens) {
+        ParseTree tree = new ParseTree(grammar.getStartSymbol()), end = new ParseTree(END_OF_INPUT);
 
-    public void parse(TokenStream tokens) {
-        Stack<Symbol> stack = new Stack<>();
-        stack.push(END_OF_INPUT);
-        stack.push(grammar.getStartSymbol());
+        Stack<ParseTree> stack = new Stack<>();
+        stack.push(end);
+        stack.push(tree);
 
         while (!stack.empty()) {
-            if (stack.peek() == EPSILON) stack.pop();
-            else if (stack.peek().isTerminal()) {
-                if (((Terminal) stack.peek()).getType() == tokens.peek().getType()) {
+            if (stack.peek().getSymbol() == EPSILON) {
+                ParseTree p = stack.pop();
+                p.getParent().remove(p);
+            }
+            else if (stack.peek().getSymbol().isTerminal()) {
+                if (stack.peek().getSymbol().matches(tokens.peek())) {
                     stack.pop();
                     tokens.next();
-                }
+                }  // else { parse error }
             }
             else {
-                Symbol[] p = get(stack.pop(), tokens.peek());
-                for (int i = p.length - 1; i >= 0; i--) stack.push(p[i]);
+                Symbol[] production = null;
+                for (Pair<Symbol, Terminal> p : map.keySet())
+                    if (p.getKey() == stack.peek().getSymbol() && p.getValue().matches(tokens.peek())) production = map.get(p);
+                ParseTree p = stack.pop();
+                p.expand(production);
+                if (production == null) throw new RuntimeException(); // parse error
+                for (int i = production.length - 1; i >= 0; i--) stack.push(p.getChildren().get(i));
             }
         }
+        return tree;
     }
 
+    // do not expand, for this method is dark & full of terrors (prints a nice table tho)
     @Override
     public String toString() {
+        Set<Symbol> nonTerminals = new HashSet<>();
+        Set<Terminal> terminals = new HashSet<>();
+        for (Pair<Symbol, Terminal> p : map.keySet()) {
+            nonTerminals.add(p.getKey());
+            terminals.add(p.getValue());
+        }
+        Symbol[] nt = new Symbol[nonTerminals.size()];
+        Terminal[] t = new Terminal[terminals.size()];
+        terminals.toArray(t);
+        nonTerminals.toArray(nt);
+
         int[] columns = new int[terminals.size()];
         for (int col = 0; col < columns.length; col++) {
             columns[col] = 3;
             for (int row = 0, l = 0; row < nonTerminals.size(); row++, l = 0) {
-                if (table[row][col] == null) continue;
+                if (map.get(new Pair<>(nt[row], t[col])) == null) continue;
 
-                for (Symbol c : table[row][col]) l += c.toString().length();
+                for (Symbol c : map.get(new Pair<>(nt[row], t[col]))) l += c.toString().length();
                 if (l > columns[col]) columns[col] = l;
             }
         }
@@ -81,15 +89,15 @@ public class ParsingTable // LL(1) Parsing Table
 
         StringBuilder s = new StringBuilder().append(String.join("", Collections.nCopies(firstCol, " "))).append('|');
         for (int i = 0; i < terminals.size(); i++)
-            s.append(String.format("%1$" + columns[i] + "s", terminals.get(i))).append('|');
+            s.append(String.format("%1$" + columns[i] + "s", t[i])).append('|');
 
-        for (int i = 0; i < table.length; i++) {
-            s.append('\n').append(String.format("%1$" + firstCol + "s", nonTerminals.get(i))).append('|');
-            for (int j = 0; j < table[i].length; j++) {
-                if (table[i][j] == null) s.append(String.join("", Collections.nCopies(columns[j], " ")));
+        for (int i = 0; i < nt.length; i++) {
+            s.append('\n').append(String.format("%1$" + firstCol + "s", nt[i])).append('|');
+            for (int j = 0; j < t.length; j++) {
+                if (map.get(new Pair<>(nt[i], t[j])) == null) s.append(String.join("", Collections.nCopies(columns[j], " ")));
                 else {
                     StringBuilder p = new StringBuilder();
-                    for (Symbol symbol : table[i][j]) p.append(symbol);
+                    for (Symbol symbol : map.get(new Pair<>(nt[i], t[j]))) p.append(symbol);
                     s.append(String.format("%1$" + columns[j] + "s", p.toString()));
                 }
                 s.append("|");

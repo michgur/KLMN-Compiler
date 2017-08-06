@@ -1,3 +1,4 @@
+import automata.NFA;
 import lex.TokenStream;
 import parsing.*;
 import lex.Token;
@@ -8,6 +9,7 @@ import lex.Token;
  */
 public class Main
 {
+    // todo: create new exceptions for each phase of compiling
     public static void main(String[] args) {
         String code = "3 * (1 + 2)";
         TokenStream t = new TokenStream(code);
@@ -26,11 +28,10 @@ public class Main
         Y.addProduction(Symbol.EPSILON);
 
         Grammar g = new Grammar(E);
-
-        System.out.println(g);
-
+        System.out.println(g + "\n");
         ParsingTable table = new ParsingTable(g);
-        System.out.println(table);
-        table.parse(t);
+        System.out.println(table + "\n");
+
+        System.out.println(table.parse(t));
     }
 }
