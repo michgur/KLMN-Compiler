@@ -28,6 +28,13 @@ public class Symbol
     public boolean isTerminal() { return false; }
     public boolean matches(Token t) { throw new IllegalStateException("Symbol " + name + " is Not a Terminal, Cannot Match Tokens"); }
 
+    public Set<Item> createItems() {
+        Set<Item> res = new HashSet<>();
+        for (Symbol[] p : productions)
+            for (int i = 0; i < p.length; i++) res.add(new Item(this, p, i));
+        return res;
+    }
+
     @Override
     public String toString() { return name; }
 }

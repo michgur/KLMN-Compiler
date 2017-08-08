@@ -21,7 +21,15 @@ public class ParseTree
 
     public void expand(Symbol[] rule) {
         if (!symbol.getProductions().contains(rule)) return;
-        for (int i = 0; i < rule.length; i++) children.add(new ParseTree(rule[i], this));
+        for (Symbol t : rule) children.add(new ParseTree(t, this));
+    }
+    public static ParseTree reduce(ParseTree[] rule, Symbol reduce) {
+        ParseTree res = new ParseTree(reduce);
+        for (ParseTree t : rule) {
+            t.parent = res;
+            res.children.add(t);
+        }
+        return res;
     }
 
     public void remove(ParseTree child) {

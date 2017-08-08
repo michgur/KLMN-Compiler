@@ -8,17 +8,30 @@ import java.util.*;
  */
 public class NFA<I>
 {
-    // [state, input] -> state set
-    List<Map<I, Set<Integer>>> nfa = new ArrayList<>();
+    List<Map<I, Set<Integer>>> transitions = new ArrayList<>();
+    List<Set<Integer>> epsilonTransitions = new ArrayList<>();
+    Set<Integer> accept = new HashSet<>();
 
-    public NFA(int size) { for (int i = 0; i < size; i++) nfa.add(new HashMap<>()); }
+    // possible todo: add values to states (Something Like NFA<S, I>. Each State Represents a Value Of Type S)
+    public NFA(int size) {
+        for (int i = 0; i < size; i++) {
+            transitions.add(new HashMap<>());
+            epsilonTransitions.add(new HashSet<>());
+        }
+    }
 
     // todo: simpler & more intuitive interface for creating NFAs, maybe using fake state pattern
-    public void addTransition(int from, int to) { addTransition(from, null, to); }
-    public void addTransition(int from, I input, int to) {
-        nfa.get(from).putIfAbsent(input, new HashSet<>());
-        nfa.get(from).get(input).add(to);
+    public int addState() {
+        transitions.add(new HashMap<>());
+        epsilonTransitions.add(new HashSet<>());
+        return transitions.size() - 1;
     }
+    public void addTransition(int from, int to) { epsilonTransitions.get(from).add(to); }
+    public void addTransition(int from, I input, int to) {
+        transitions.get(from).putIfAbsent(input, new HashSet<>());
+        transitions.get(from).get(input).add(to);
+    }
+    public void acceptOn(int state) { accept.add(state); }
 
     public boolean test(Iterator<I> input) {
         Set<Integer> states = new HashSet<>();
@@ -33,8 +46,8 @@ public class NFA<I>
                 while (!epsilon.isEmpty()) {
                     Set<Integer> nextE = new HashSet<>();
                     for (int stateE : epsilon) {
-                        if (nfa.get(stateE).get(value) != null) next.addAll(nfa.get(stateE).get(value));
-                        if (nfa.get(stateE).get(null) != null) nextE.addAll(nfa.get(stateE).get(null));
+                        if (transitions.get(stateE).get(value) != null) next.addAll(transitions.get(stateE).get(value));
+                        nextE.addAll(epsilonTransitions.get(stateE));
                     }
                     epsilon = nextE;
                 }
@@ -45,7 +58,7 @@ public class NFA<I>
         // but didn't reach the final state, so states.size() might be bigger than 1.
         // we only care about the final state
         boolean accept = false;
-        for (int i : states) accept |= epsilonClosure(i).contains(nfa.size() - 1);
+        for (int i : states) accept |= !Collections.disjoint(epsilonClosure(i), this.accept);
         return !input.hasNext() && accept;
     }
 
@@ -54,9 +67,8 @@ public class NFA<I>
     Set<Integer> epsilonClosure(int state) {
         Set<Integer> res = new HashSet<>();
         res.add(state);
-        if (nfa.get(state).get(null) != null)
-            for (int i : nfa.get(state).get(null)) if (!res.contains(i)) res.addAll(epsilonClosure(i));
-
+        for (int i : epsilonTransitions.get(state))
+            if (!res.contains(i)) res.addAll(epsilonClosure(i));
         return res;
     }
 
@@ -64,18 +76,39 @@ public class NFA<I>
     public String toString() {
         StringBuilder s = new StringBuilder().append("NFA {\n");
         String abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        boolean useABC = nfa.size() < 27;
+        boolean useABC = transitions.size() < 27;
 
-        for (int i = 0; i < nfa.size(); i++) {
-            if (nfa.get(i).size() == 0) break;
-            s.append('\t').append((useABC) ? abc.charAt(i) : "" + i).append('[');
-            for (I key : nfa.get(i).keySet()) {
-                if (nfa.get(i).get(key).size() == 0) break;
-                s.append((key != null) ? key : "ε").append("-> {");
-                for (int symbol : nfa.get(i).get(key)) s.append((useABC) ? abc.charAt(symbol) : "" + symbol).append(", ");
+        for (int i = 0; i < transitions.size(); i++) {
+            s.append('\t');
+            if (accept.contains(i)) s.append("\033[0;4m");
+            s.append((useABC) ? abc.charAt(i) : "" + i);
+            if (accept.contains(i)) s.append("\033[0;24m");
+            s.append('[');
+            if (transitions.get(i).size() == 0 && epsilonTransitions.get(i).isEmpty()) break;
+            for (I key : transitions.get(i).keySet()) {
+                if (transitions.get(i).get(key).size() == 0) break;
+                s.append(key).append("-> {");
+                for (int symbol : transitions.get(i).get(key)) {
+                    if (accept.contains(symbol)) s.append("\033[0;4m");
+                    s.append((useABC) ? abc.charAt(symbol) : "" + symbol);
+                    if (accept.contains(symbol)) s.append("\033[0;24m");
+                    s.append(", ");
+                }
                 s.delete(s.length() - 2, s.length()).append("}, ");
             }
-            s.delete(s.length() - 2, s.length()).append("]\n");
+            if (!epsilonTransitions.get(i).isEmpty()) {
+                s.append("ε-> {");
+                for (int symbol : epsilonTransitions.get(i)) {
+                    if (accept.contains(symbol)) s.append("\033[0;4m");
+                    s.append((useABC) ? abc.charAt(symbol) : "" + symbol);
+                    if (accept.contains(symbol)) s.append("\033[0;24m");
+                    s.append(", ");
+                }
+                s.delete(s.length() - 2, s.length()).append("}, ");
+            }
+            s.delete(s.length() - 2, s.length()).append(']');
+            if (accept.contains(i)) s.append(" accept");
+            s.append('\n');
         }
 
         return s.append('}').toString();

@@ -18,9 +18,11 @@ public class Grammar
     private HashMap<Symbol, Set<Symbol>> firstSets = new HashMap<>(), followSets = new HashMap<>();
 
     public Grammar(Symbol start) {
-        this.start = start;
-        add(start);
+        this.start = new Symbol("S'");
+        this.start.addProduction(start);
+        add(this.start);
 
+        symbols.add(this.start);
         symbols.forEach(this::generateFirstSet);
         generateFollowSets();
 
@@ -96,8 +98,11 @@ public class Grammar
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
+
+        s.append(start).append(" -> "); // only one production, from S' to actual start
+        for (Symbol[] rule : start.getProductions()) s.append(rule[0]).append('\n');
         for (Symbol symbol : symbols) {
-            if (symbol.isTerminal()) continue;
+            if (symbol.isTerminal() || symbol == start) continue;
 
             s.append(symbol).append(" -> ");
             for (Symbol[] rule : symbol.getProductions()) {

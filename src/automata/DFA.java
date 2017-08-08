@@ -1,7 +1,5 @@
 package automata;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.*;
 
 /**
@@ -10,18 +8,17 @@ import java.util.*;
  */
 public class DFA<I>
 {
-    List<Map<I, Integer>> dfa = new ArrayList<>();
-    Set<Integer> accept = new HashSet<>();
+    private List<Map<I, Integer>> dfa = new ArrayList<>();
+    private Set<Integer> accept = new HashSet<>();
 
-    DFA() {}
+    public DFA() {}
     public DFA(int size) { for (int i = 0; i < size; i++) dfa.add(new HashMap<>()); }
 
-    int addState() {
+    public int addState() {
         dfa.add(new HashMap<>());
         return dfa.size() - 1;
     }
-
-    public void addTransition(int from, @NotNull I input, int to) { dfa.get(from).put(input, to); }
+    public void addTransition(int from, I input, int to) { dfa.get(from).put(input, to); }
     public void acceptOn(int state) { accept.add(state); }
 
     public boolean test(Iterator<I> input) {

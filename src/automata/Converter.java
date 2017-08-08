@@ -1,9 +1,6 @@
 package automata;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * ಠ^ಠ.
@@ -13,7 +10,7 @@ class Converter<I>
 {
     private NFA<I> src;
     private DFA<I> res = new DFA<>();
-    private int end;
+    private Set<Integer> end;
 
     // NFA index to DFA index
     private Map<Set<Integer>, Integer> indices = new HashMap<>();
@@ -22,10 +19,10 @@ class Converter<I>
 
     Converter(NFA<I> src) {
         this.src = src;
-        end = src.nfa.size() - 1;
+        end = src.accept;
     }
 
-    public DFA<I> convert() {
+    DFA<I> convert() {
         generateState(epsilonClosure(0));
         return res;
     }
@@ -34,15 +31,14 @@ class Converter<I>
     private void generateState(Set<Integer> state) {
         int index = res.addState();
         indices.put(state, index);
-        if (state.contains(end)) res.acceptOn(index);
+        if (!Collections.disjoint(state, end)) res.acceptOn(index);
 
         Map<I, Set<Integer>> nextStates = new HashMap<>();
         for (int s : state)
-            for (I input : src.nfa.get(s).keySet())
-                if (input != null) {
-                    nextStates.putIfAbsent(input, new HashSet<>());
-                    nextStates.get(input).addAll(src.nfa.get(s).get(input));
-                }
+            for (I input : src.transitions.get(s).keySet()) {
+                nextStates.putIfAbsent(input, new HashSet<>());
+                nextStates.get(input).addAll(src.transitions.get(s).get(input));
+            }
         for (I input : nextStates.keySet()) {
             nextStates.put(input, epsilonClosure(nextStates.get(input)));
             if (indices.get(nextStates.get(input)) == null) generateState(nextStates.get(input));
