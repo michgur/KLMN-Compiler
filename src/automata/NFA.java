@@ -9,12 +9,12 @@ import java.util.*;
 public class NFA<I>
 {
     // [state, input] -> state set
-    private List<Map<I, Set<Integer>>> nfa = new ArrayList<>();
+    List<Map<I, Set<Integer>>> nfa = new ArrayList<>();
 
     public NFA(int size) { for (int i = 0; i < size; i++) nfa.add(new HashMap<>()); }
 
     // todo: simpler & more intuitive interface for creating NFAs, maybe using fake state pattern
-    public void addETransition(int from, int to) { addTransition(from, null, to); }
+    public void addTransition(int from, int to) { addTransition(from, null, to); }
     public void addTransition(int from, I input, int to) {
         nfa.get(from).putIfAbsent(input, new HashSet<>());
         nfa.get(from).get(input).add(to);
@@ -47,6 +47,17 @@ public class NFA<I>
         // but didn't reach the final state, so states.size() might be bigger than 1.
         // we only care about the final state
         return !input.hasNext() && states.remove(nfa.size() - 1);
+    }
+
+    public DFA<I> toDFA() { return new Converter<>(this).convert(); }
+
+    Set<Integer> epsilonClosure(int state) {
+        Set<Integer> res = new HashSet<>();
+        res.add(state);
+        if (nfa.get(state).get(null) != null)
+            for (int i : nfa.get(state).get(null)) if (!res.contains(i)) res.addAll(epsilonClosure(i));
+
+        return res;
     }
 
     @Override

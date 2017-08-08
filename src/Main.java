@@ -1,7 +1,13 @@
+import automata.DFA;
 import automata.NFA;
 import lex.TokenStream;
 import parsing.*;
 import lex.Token;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
 
 /**
  * ಠ^ಠ.
@@ -27,11 +33,40 @@ public class Main
         Y.addProduction(mul, T);
         Y.addProduction(Symbol.EPSILON);
 
-        Grammar g = new Grammar(E);
-        System.out.println(g + "\n");
-        ParsingTable table = new ParsingTable(g);
-        System.out.println(table + "\n");
+//        Grammar g = new Grammar(E);
+//        System.out.println(g + "\n");
+//        ParsingTable table = new ParsingTable(g);
+//        System.out.println(table + "\n");
+//        System.out.println(table.parse(t));
 
-        System.out.println(table.parse(t));
+        NFA<Integer> nfa = new NFA<>(10);
+        nfa.addTransition(0, 1);
+        nfa.addTransition(0, 7);
+        nfa.addTransition(1, 2);
+        nfa.addTransition(1, 3);
+        nfa.addTransition(2, 1, 4);
+        nfa.addTransition(3, 0, 5);
+        nfa.addTransition(4, 6);
+        nfa.addTransition(5, 6);
+        nfa.addTransition(6, 0);
+        nfa.addTransition(6, 7);
+        nfa.addTransition(7, 8);
+        nfa.addTransition(8, 1, 9);
+
+//        DFA<Integer> dfa = new DFA<>(3);
+//        dfa.addTransition(0, 1, 1);
+//        dfa.addTransition(0, 0, 2);
+//        dfa.addTransition(1, 1, 1);
+//        dfa.addTransition(1, 0, 2);
+//        dfa.addTransition(2, 1, 1);
+//        dfa.addTransition(2, 0, 2);
+//        dfa.acceptOn(1);
+//        System.out.println(dfa);
+//
+        List<Integer> input = new ArrayList<>();
+        for (int i = 0; i < 1000; i++) input.add((int) Math.round(Math.random()));
+        input.add(1);
+        System.out.println(nfa.test(input.iterator()));
+        System.out.println(nfa.toDFA().test(input.iterator()));
     }
 }
