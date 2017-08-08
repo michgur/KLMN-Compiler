@@ -23,7 +23,6 @@ public class NFA<I>
     public boolean test(Iterator<I> input) {
         Set<Integer> states = new HashSet<>();
         states.add(0);
-
         while (!states.isEmpty() && input.hasNext()) {
             I value = input.next();
             Set<Integer> next = new HashSet<>();
@@ -42,11 +41,12 @@ public class NFA<I>
             }
             states = next;
         }
-
         // some paths of the test might have consumed all of the input
         // but didn't reach the final state, so states.size() might be bigger than 1.
         // we only care about the final state
-        return !input.hasNext() && states.remove(nfa.size() - 1);
+        boolean accept = false;
+        for (int i : states) accept |= epsilonClosure(i).contains(nfa.size() - 1);
+        return !input.hasNext() && accept;
     }
 
     public DFA<I> toDFA() { return new Converter<>(this).convert(); }
@@ -78,6 +78,6 @@ public class NFA<I>
             s.delete(s.length() - 2, s.length()).append("]\n");
         }
 
-        return s.append("}\n").toString();
+        return s.append('}').toString();
     }
 }

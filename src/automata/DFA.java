@@ -58,6 +58,6 @@ public class DFA<I>
             s.append('\n');
         }
 
-        return s.append("}\n").toString();
+        return s.append('}').toString();
     }
 }
