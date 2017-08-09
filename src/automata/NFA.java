@@ -4,26 +4,29 @@ import java.util.*;
 
 /**
  * ಠ^ಠ.
+ *
+ * A Nondeterministic Finite State Machine
+ * S - State Value Type
+ * I - Input Type
+ *
  * Created by Michael on 8/5/2017.
  */
-public class NFA<I>
+public class NFA<S, I>
 {
+    // todo: better interface (consider using fake state pattern)
+
     List<Map<I, Set<Integer>>> transitions = new ArrayList<>();
     List<Set<Integer>> epsilonTransitions = new ArrayList<>();
     Set<Integer> accept = new HashSet<>();
 
-    // possible todo: add values to states (Something Like NFA<S, I>. Each State Represents a Value Of Type S)
-    public NFA(int size) {
-        for (int i = 0; i < size; i++) {
-            transitions.add(new HashMap<>());
-            epsilonTransitions.add(new HashSet<>());
-        }
-    }
+    List<S> values = new ArrayList<>();
 
-    // todo: simpler & more intuitive interface for creating NFAs, maybe using fake state pattern
-    public int addState() {
+    public NFA() {}
+
+    public int addState(S value) {
         transitions.add(new HashMap<>());
         epsilonTransitions.add(new HashSet<>());
+        values.add(value);
         return transitions.size() - 1;
     }
     public void addTransition(int from, int to) { epsilonTransitions.get(from).add(to); }
@@ -32,6 +35,8 @@ public class NFA<I>
         transitions.get(from).get(input).add(to);
     }
     public void acceptOn(int state) { accept.add(state); }
+
+    public S getState(int index) { return values.get(index); }
 
     public boolean test(Iterator<I> input) {
         Set<Integer> states = new HashSet<>();
@@ -62,7 +67,7 @@ public class NFA<I>
         return !input.hasNext() && accept;
     }
 
-    public DFA<I> toDFA() { return new Converter<>(this).convert(); }
+    public DFA<S, I> toDFA() { return new Converter<>(this).convert(); }
 
     Set<Integer> epsilonClosure(int state) {
         Set<Integer> res = new HashSet<>();
@@ -75,22 +80,25 @@ public class NFA<I>
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder().append("NFA {\n");
-        String abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        boolean useABC = transitions.size() < 27;
-
+        int digits = (int) Math.log10(transitions.size()) + 1;
         for (int i = 0; i < transitions.size(); i++) {
-            s.append('\t');
+            s.append('\t').append(String.format("%1$" + digits + "s:  ", i));
             if (accept.contains(i)) s.append("\033[0;4m");
-            s.append((useABC) ? abc.charAt(i) : "" + i);
+            s.append(getState(i));
             if (accept.contains(i)) s.append("\033[0;24m");
             s.append('[');
-            if (transitions.get(i).size() == 0 && epsilonTransitions.get(i).isEmpty()) break;
+            if (transitions.get(i).size() == 0 && epsilonTransitions.get(i).isEmpty()) {
+                s.deleteCharAt(s.length() - 1);
+                if (accept.contains(i)) s.append(" accept");
+                s.append("\n");
+                continue;
+            }
             for (I key : transitions.get(i).keySet()) {
                 if (transitions.get(i).get(key).size() == 0) break;
                 s.append(key).append("-> {");
                 for (int symbol : transitions.get(i).get(key)) {
                     if (accept.contains(symbol)) s.append("\033[0;4m");
-                    s.append((useABC) ? abc.charAt(symbol) : "" + symbol);
+                    s.append(symbol);
                     if (accept.contains(symbol)) s.append("\033[0;24m");
                     s.append(", ");
                 }
@@ -100,7 +108,7 @@ public class NFA<I>
                 s.append("ε-> {");
                 for (int symbol : epsilonTransitions.get(i)) {
                     if (accept.contains(symbol)) s.append("\033[0;4m");
-                    s.append((useABC) ? abc.charAt(symbol) : "" + symbol);
+                    s.append(symbol);
                     if (accept.contains(symbol)) s.append("\033[0;24m");
                     s.append(", ");
                 }

@@ -4,48 +4,59 @@ import java.util.*;
 
 /**
  * ಠ^ಠ.
+ *
+ * * A Deterministic Finite State Machine
+ * S - State Value Type
+ * I - Input Type
+ *
  * Created by Michael on 8/7/2017.
  */
-public class DFA<I>
+public class DFA<S, I>
 {
-    private List<Map<I, Integer>> dfa = new ArrayList<>();
+    private List<Map<I, Integer>> transitions = new ArrayList<>();
     private Set<Integer> accept = new HashSet<>();
+    private int terminated;
+
+    private List<Set<S>> values = new ArrayList();
 
     public DFA() {}
-    public DFA(int size) { for (int i = 0; i < size; i++) dfa.add(new HashMap<>()); }
 
-    public int addState() {
-        dfa.add(new HashMap<>());
-        return dfa.size() - 1;
+    public int addState(Set<S> value) {
+        transitions.add(new HashMap<>());
+        values.add(value);
+        return transitions.size() - 1;
     }
-    public void addTransition(int from, I input, int to) { dfa.get(from).put(input, to); }
+    public void addTransition(int from, I input, int to) { transitions.get(from).put(input, to); }
     public void acceptOn(int state) { accept.add(state); }
 
     public boolean test(Iterator<I> input) {
         Integer state = 0, next;
-        while (input.hasNext() && (next = dfa.get(state).get(input.next())) != null) { state = next; }
+        while (input.hasNext() && (next = transitions.get(state).get(input.next())) != null) { state = next; }
+        terminated = state;
         return !input.hasNext() && accept.contains(state);
     }
+
+    public int getTerminatedState() { return terminated; }
+
+    public Set<S> getState(int index) { return values.get(index); }
 
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder().append("DFA {\n");
-        String abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        boolean useABC = dfa.size() < 27;
-
-        for (int i = 0; i < dfa.size(); i++) {
-            s.append('\t');
+        int digits = (int) Math.log10(transitions.size()) + 1;
+        for (int i = 0; i < transitions.size(); i++) {
+            s.append('\t').append(String.format("%1$" + digits + "s:  ", i));
             if (accept.contains(i)) s.append("\033[0;4m");
-            s.append((useABC) ? abc.charAt(i) : "" + i);
+            s.append(getStateString(i));
             if (accept.contains(i)) s.append("\033[0;24m");
-            if (dfa.get(i).size() == 0) { s.append("\n"); continue; }
+            if (transitions.get(i).size() == 0) { s.append("\n"); continue; }
             s.append('[');
-            for (I key : dfa.get(i).keySet()) {
-                Integer t = dfa.get(i).get(key);
+            for (I key : transitions.get(i).keySet()) {
+                Integer t = transitions.get(i).get(key);
                 if (t == null) break;
                 s.append(key).append("-> ");
                 if (accept.contains(t)) s.append("\033[0;4m");
-                s.append((useABC) ? abc.charAt(t) : "" + t).append(", ");
+                s.append(t).append(", ");
                 s.delete(s.length() - 2, s.length());
                 if (accept.contains(t)) s.append("\033[0;24m");
                 s.append(", ");
@@ -56,5 +67,10 @@ public class DFA<I>
         }
 
         return s.append('}').toString();
+    }
+
+    private String getStateString(int index) {
+        String s = getState(index).toString();
+        return '{' + s.substring(1, s.length() - 1) + '}';
     }
 }

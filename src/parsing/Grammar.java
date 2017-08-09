@@ -1,7 +1,10 @@
 package parsing;
 
+import lex.Token;
+
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static parsing.Terminal.*;
@@ -15,13 +18,15 @@ public class Grammar
     private Set<Symbol> symbols = new HashSet<>();
     private Symbol start = null;
 
-    private HashMap<Symbol, Set<Symbol>> firstSets = new HashMap<>(), followSets = new HashMap<>();
+    private Map<Symbol[], Symbol> rules = new HashMap<>();
+    private Map<Symbol, Set<Symbol>> firstSets = new HashMap<>(), followSets = new HashMap<>();
 
     public Grammar(Symbol start) {
         this.start = new Symbol("S'");
         this.start.addProduction(start);
         add(this.start);
 
+        symbols.add(END_OF_INPUT);
         symbols.add(this.start);
         symbols.forEach(this::generateFirstSet);
         generateFollowSets();
@@ -35,10 +40,19 @@ public class Grammar
     public Set<Symbol> firstSet(Symbol symbol) { return firstSets.get(symbol); }
     public Set<Symbol> followSet(Symbol symbol) { return followSets.get(symbol); }
 
+    public Symbol reduce(Symbol... symbols) { return rules.get(symbols); }
+
+    public Symbol getSymbol(Token t) {
+        for (Symbol s : symbols) if (s.isTerminal() && s.matches(t)) return s;
+        return null;
+    }
+
     private void add(Symbol symbol) {
         symbol.used = true;
-        for (Symbol[] rule : symbol.getProductions())
+        for (Symbol[] rule : symbol.getProductions()) {
+            rules.put(rule, symbol);
             for (Symbol child : rule) if (symbols.add(child)) add(child);
+        }
     }
 
     public Set<Symbol> firstSet(Symbol[] s) {
@@ -67,7 +81,6 @@ public class Grammar
         }
         return firstSets.get(symbol);
     }
-
     private void generateFollowSets() {
         symbols.forEach(s -> followSets.put(s, new HashSet<>()));
         followSets.get(start).add(END_OF_INPUT);

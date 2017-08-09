@@ -4,12 +4,17 @@ import java.util.*;
 
 /**
  * ಠ^ಠ.
+ *
+ * A Helper Class To Convert NFAs to DFAs
+ * S - State Value Type
+ * I - Input Type
+ *
  * Created by Michael on 8/8/2017.
  */
-class Converter<I>
+class Converter<S, I>
 {
-    private NFA<I> src;
-    private DFA<I> res = new DFA<>();
+    private NFA<S, I> src;
+    private DFA<S, I> res = new DFA<>();
     private Set<Integer> end;
 
     // NFA index to DFA index
@@ -17,19 +22,21 @@ class Converter<I>
     // store epsilon closures of src
     private Map<Integer, Set<Integer>> epsClosure = new HashMap<>();
 
-    Converter(NFA<I> src) {
+    Converter(NFA<S, I> src) {
         this.src = src;
         end = src.accept;
     }
 
-    DFA<I> convert() {
+    DFA<S, I> convert() {
         generateState(epsilonClosure(0));
         return res;
     }
 
     // generate DFA state from NFA states
     private void generateState(Set<Integer> state) {
-        int index = res.addState();
+        Set<S> value = new HashSet<>();
+        state.forEach(i -> value.add(src.getState(i)));
+        int index = res.addState(value);
         indices.put(state, index);
         if (!Collections.disjoint(state, end)) res.acceptOn(index);
 
