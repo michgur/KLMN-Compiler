@@ -34,16 +34,22 @@ public class Grammar
         symbols.remove(EPSILON);
     }
 
-    public Set<Symbol> getSymbols() { return symbols; }
+    public Set<Symbol> symbols() { return symbols; }
     public Symbol getStartSymbol() { return start; }
+
+    public Set<Terminal> terminals() {
+        Set<Terminal> terminals = new HashSet<>();
+        for (Symbol s : symbols) if (s.isTerminal()) terminals.add((Terminal) s);
+        return terminals;
+    }
 
     public Set<Symbol> firstSet(Symbol symbol) { return firstSets.get(symbol); }
     public Set<Symbol> followSet(Symbol symbol) { return followSets.get(symbol); }
 
     public Symbol reduce(Symbol... symbols) { return rules.get(symbols); }
 
-    public Symbol getSymbol(Token t) {
-        for (Symbol s : symbols) if (s.isTerminal() && s.matches(t)) return s;
+    public Terminal getTerminal(Token t) {
+        for (Symbol s : symbols) if (s.isTerminal() && s.matches(t)) return (Terminal) s;
         return null;
     }
 

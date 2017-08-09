@@ -1,8 +1,7 @@
-import automata.DFA;
-import automata.NFA;
 import lex.TokenStream;
 import parsing.*;
 import lex.Token;
+import parsing.slr.Parser;
 
 /**
  * ಠ^ಠ.

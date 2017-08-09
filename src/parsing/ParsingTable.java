@@ -18,7 +18,7 @@ public class ParsingTable // LL(1) Parsing Table
 
     public ParsingTable(Grammar grammar) {
         this.grammar = grammar;
-        for (Symbol s : grammar.getSymbols())
+        for (Symbol s : grammar.symbols())
             for (Symbol[] p : s.getProductions()) {
                 Set<Symbol> set = new HashSet<>();
                 set.addAll(grammar.firstSet(p));

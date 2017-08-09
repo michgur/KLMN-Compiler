@@ -36,9 +36,11 @@ public class DFA<S, I>
         return !input.hasNext() && accept.contains(state);
     }
 
-    public int getTerminatedState() { return terminated; }
+    public int getAcceptingState() { return terminated; }
 
     public Set<S> getState(int index) { return values.get(index); }
+
+    public int getTransition(int from, I input) { return transitions.get(from).get(input); }
 
     @Override
     public String toString() {
@@ -73,4 +75,6 @@ public class DFA<S, I>
         String s = getState(index).toString();
         return '{' + s.substring(1, s.length() - 1) + '}';
     }
+
+    public int size() { return transitions.size(); }
 }
