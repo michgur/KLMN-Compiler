@@ -16,7 +16,7 @@ import static parsing.Terminal.*;
 public class Grammar
 {
     private Set<Symbol> symbols = new HashSet<>();
-    private Symbol start = null;
+    private Symbol start;
 
     private Map<Symbol[], Symbol> rules = new HashMap<>();
     private Map<Symbol, Set<Symbol>> firstSets = new HashMap<>(), followSets = new HashMap<>();
@@ -117,9 +117,6 @@ public class Grammar
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
-
-        s.append(start).append(" -> "); // only one production, from S' to actual start
-        for (Symbol[] rule : start.getProductions()) s.append(rule[0]).append('\n');
         for (Symbol symbol : symbols) {
             if (symbol.isTerminal() || symbol == start) continue;
 
@@ -128,8 +125,7 @@ public class Grammar
                 for (Symbol child : rule) s.append(child);
                 s.append(" | ");
             }
-            s.delete(s.length() - 3, s.length());
-            s.append('\n');
+            s.delete(s.length() - 3, s.length()).append('\n');
         }
         return s.deleteCharAt(s.length() - 1).toString();
     }

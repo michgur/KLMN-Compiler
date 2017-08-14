@@ -56,6 +56,7 @@ public class ParsingTable // LL(1) Parsing Table
                 for (int i = production.length - 1; i >= 0; i--) stack.push(p.getChildren().get(i));
             }
         }
+        tree.removeRedundant();
         return tree;
     }
 

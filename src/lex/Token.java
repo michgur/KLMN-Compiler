@@ -1,5 +1,7 @@
 package lex;
 
+import parsing.Terminal;
+
 /**
  * ಠ^ಠ.
  * Created by Michael on 8/3/2017.
@@ -7,15 +9,31 @@ package lex;
 public class Token
 {
     public enum Type {
-        IDENTIFIER,
-        NUMBER,
-        STRING,
-        OPEN_PAREN,
-        CLOSE_PAREN,
-        PLUS,
-        TIMES,
-        END,
-        KEYWORD
+        IDENTIFIER("id"),
+        NUMBER("num"),
+        STRING("str"),
+        OPEN_PAREN("("),
+        CLOSE_PAREN(")"),
+        OPEN_BRACKET("["),
+        CLOSE_BRACKET("]"),
+        OPEN_CURLY("{"),
+        CLOSE_CURLY("}"),
+        PLUS("+"),
+        DASH("-"),
+        ASTERISK("*"),
+        SLASH("/"),
+        EQUALS("="),
+        COMMA(","),
+        SEMICOLON(";"),
+        END("$"),
+        CLASS("class"); // remove
+
+        // temporary
+        public Terminal t;
+        Type(String name) {
+            t = new Terminal(name, this);
+            if (name.equals("$")) t = Terminal.END_OF_INPUT;
+        }
     }
 
     private Type type;

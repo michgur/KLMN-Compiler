@@ -19,7 +19,7 @@ public class Symbol
 
     public Symbol(String name) { this.name = name; }
 
-    public void addProduction(Symbol... p) {
+    public final void addProduction(Symbol... p) {
         if (used) throw new IllegalStateException("Cannot Modify Symbol " + name + " After Constructing Grammar!");
         productions.add(p);
     }

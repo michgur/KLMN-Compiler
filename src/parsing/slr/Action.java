@@ -2,6 +2,7 @@ package parsing.slr;
 
 import automata.DFA;
 import javafx.util.Pair;
+import lex.Token;
 import parsing.Grammar;
 import parsing.Symbol;
 import parsing.Terminal;
@@ -13,7 +14,7 @@ import java.util.Map;
  * ಠ^ಠ.
  * Created by Michael on 8/9/2017.
  */
-public class Action
+class Action // SLR(1) Action
 {
     public enum Type { SHIFT, REDUCE, ACCEPT, ERROR }
 
@@ -25,18 +26,22 @@ public class Action
     private Action(Type type, Item item) { this(type); this.item = item; }
     private Action(Type type, int state) { this(type); this.state = state; }
 
+    // in case of shift/ reduce conflicts, we choose to shift
     public static Map<Pair<Integer, Terminal>, Action> generateActionMap(Grammar grammar, DFA<Item, Symbol> dfa) {
         Map<Pair<Integer, Terminal>, Action> action = new HashMap<>();
         for (Terminal t : grammar.terminals()) {
             for (int i = 0; i < dfa.size(); i++) {
                 Pair<Integer, Terminal> pair = new Pair<>(i, t);
                 for (Item item : dfa.getState(i)) {
-                    if (!item.canReduce() && t == item.production[item.index])
+                    if (!item.canReduce() && t == item.production[item.index]) {
                         action.put(pair, new Action(Type.SHIFT, dfa.getTransition(i, t)));
+                        break;
+                    }
                     else if (item.symbol == grammar.getStartSymbol() && item.canReduce())
                         action.put(pair, new Action(Type.ACCEPT));
-                    else if (item.canReduce() && grammar.followSet(item.symbol).contains(t))
+                    else if (item.canReduce() && grammar.followSet(item.symbol).contains(t)) {
                         action.put(pair, new Action(Type.REDUCE, item));
+                    }
                 }
                 if (action.get(pair) == null) action.put(pair, new Action(Type.ERROR));
             }

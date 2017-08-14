@@ -51,7 +51,11 @@ public class DFA<S, I>
             if (accept.contains(i)) s.append("\033[0;4m");
             s.append(getStateString(i));
             if (accept.contains(i)) s.append("\033[0;24m");
-            if (transitions.get(i).size() == 0) { s.append("\n"); continue; }
+            if (transitions.get(i).size() == 0) {
+                if (accept.contains(i)) s.append(" accept");
+                s.append('\n');
+                continue;
+            }
             s.append('[');
             for (I key : transitions.get(i).keySet()) {
                 Integer t = transitions.get(i).get(key);

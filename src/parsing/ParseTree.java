@@ -32,11 +32,16 @@ public class ParseTree
         return res;
     }
 
+    public boolean removeRedundant() {
+        for (ParseTree child : new ArrayList<>(children)) child.removeRedundant();
+        if (children.size() > 0 || parent == null || symbol.isTerminal()) return false;
+        parent.remove(this);
+        return true;
+    }
+
     public void remove(ParseTree child) {
         child.parent = null;
         children.remove(child);
-
-        if (children.size() == 0 && parent != null) parent.remove(this);
     }
 
     public ParseTree get(Symbol symbol) {

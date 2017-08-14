@@ -35,6 +35,8 @@ public class Parser // SLR(1) Parser
         action = Action.generateActionMap(grammar, dfa);
     }
 
+    public DFA<Item, Symbol> getDFA() { return dfa; }
+
     public ParseTree parse(TokenStream input) {
         Stack<Pair<ParseTree, Integer>> stack = new Stack<>();
         stack.push(new Pair<>(null, 0));
@@ -59,7 +61,9 @@ public class Parser // SLR(1) Parser
                 default:
                     throw new RuntimeException("Parsing Error!");
             }
-        } return stack.get(1).getKey();
+        }
+        stack.get(1).getKey().removeRedundant();
+        return stack.get(1).getKey();
     }
 
     private int generateState(NFA<Item, Symbol> nfa, Map<Item, Integer> items, Item item) {

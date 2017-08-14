@@ -69,12 +69,15 @@ public class NFA<S, I>
 
     public DFA<S, I> toDFA() { return new Converter<>(this).convert(); }
 
-    Set<Integer> epsilonClosure(int state) {
-        Set<Integer> res = new HashSet<>();
-        res.add(state);
+    public Set<Integer> epsilonClosure(int state) {
+        Set<Integer> e = new HashSet<>();
+        epsilonClosure(state, e);
+        return e;
+    }
+    private void epsilonClosure(int state, Set<Integer> set) {
+        set.add(state);
         for (int i : epsilonTransitions.get(state))
-            if (!res.contains(i)) res.addAll(epsilonClosure(i));
-        return res;
+            if (!set.contains(i)) epsilonClosure(i, set);
     }
 
     @Override

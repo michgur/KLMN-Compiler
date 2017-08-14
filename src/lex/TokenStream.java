@@ -9,12 +9,6 @@ import java.util.function.Consumer;
  */
 public class TokenStream implements Iterator<Token>
 {
-    public static final Token END = new Token(Token.Type.END, "$");
-
-    private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
-        "if", "else", "for", "while", "true", "false"
-    ));
-    
     private String code;
     private int index, length;
     private boolean end = false;
@@ -49,7 +43,7 @@ public class TokenStream implements Iterator<Token>
     private Token readNext() {
         if (index >= length) {
             end = true;
-            return END;
+            return new Token(Token.Type.END, "$");
         }
         char c = code.charAt(index);
 
@@ -60,15 +54,30 @@ public class TokenStream implements Iterator<Token>
         if (Character.isLetter(c) || c == '_') return readIdentifier();
         if (Character.isDigit(c)) return readNumber();
         if (c == '"') return readString();
+        if (c == '#') { // comment
+            index = code.indexOf('\n', index) + 1;
+            if (index == 0) index = length;
+            return readNext();
+        }
 
         index++;
-        if (c == '+') return new Token(Token.Type.PLUS, c + "");
-        if (c == '(') return new Token(Token.Type.OPEN_PAREN, c + "");
-        if (c == ')') return new Token(Token.Type.CLOSE_PAREN, c + "");
-        if (c == '*') return new Token(Token.Type.TIMES, c + "");
+        switch (c) {
+            case '(': return new Token(Token.Type.OPEN_PAREN, c + "");
+            case ')': return new Token(Token.Type.CLOSE_PAREN, c + "");
+            case '{': return new Token(Token.Type.OPEN_CURLY, c + "");
+            case '}': return new Token(Token.Type.CLOSE_CURLY, c + "");
+            case '[': return new Token(Token.Type.OPEN_BRACKET, c + "");
+            case ']': return new Token(Token.Type.CLOSE_BRACKET, c + "");
+            case '+': return new Token(Token.Type.PLUS, c + "");
+            case '-': return new Token(Token.Type.DASH, c + "");
+            case '*': return new Token(Token.Type.ASTERISK, c + "");
+            case '/': return new Token(Token.Type.SLASH, c + "");
+            case '=': return new Token(Token.Type.EQUALS, c + "");
+            case ';': return new Token(Token.Type.SEMICOLON, c + "");
+            case ',': return new Token(Token.Type.COMMA, c + "");
 
-
-        throw new RuntimeException("Error: Can't Handle Char " + c + " at " + index);
+            default: throw new RuntimeException("Error: Can't Handle Char " + c + " at " + index);
+        }
     }
 
     private Token readString() {
@@ -95,13 +104,15 @@ public class TokenStream implements Iterator<Token>
     }
 
     private Token readIdentifier() {
-        StringBuilder value = new StringBuilder().append(code.charAt(index++));
-        while (index < length) {
-            char c = code.charAt(index++);
+        StringBuilder value = new StringBuilder().append(code.charAt(index));
+        while (++index < length) {
+            char c = code.charAt(index);
             if (Character.isLetterOrDigit(c) || c == '_') value.append(c);
             else break;
         }
         String v = value.toString();
-        return new Token((KEYWORDS.contains(v)) ? Token.Type.KEYWORD : Token.Type.IDENTIFIER, v);
+        if (v.equals("class")) return new Token(Token.Type.CLASS, "class");
+
+        return new Token(Token.Type.IDENTIFIER, v);
     }
 }
