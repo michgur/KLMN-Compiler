@@ -60,8 +60,10 @@ public class ParseTree
 
     public ParseTree getParent() { return parent; }
     public List<ParseTree> getChildren() { return children; }
+    public ParseTree getChild(int i) { return children.get(i); }
 
     public Symbol getSymbol() { return symbol; }
+    public Token getValue() { return token; }
 
     @Override
     public String toString() {
