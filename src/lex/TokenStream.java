@@ -83,7 +83,7 @@ public class TokenStream implements Iterator<Token>
     private Token readString() {
         int end = code.indexOf('"', index + 1);
         if (end == -1) throw new RuntimeException("Lexing Error String Blah Blah Blah");
-        String value = code.substring(index, end);
+        String value = code.substring(index, end + 1);
         index = end + 1;
         return new Token(Token.Type.STRING, value);
     }
@@ -112,6 +112,8 @@ public class TokenStream implements Iterator<Token>
         }
         String v = value.toString();
         if (v.equals("class")) return new Token(Token.Type.CLASS, "class");
+        if (v.equals("true")) return new Token(Token.Type.TRUE, "true");
+        if (v.equals("false")) return new Token(Token.Type.FALSE, "false");
 
         return new Token(Token.Type.IDENTIFIER, v);
     }

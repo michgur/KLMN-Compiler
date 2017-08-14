@@ -49,7 +49,7 @@ public class Parser // SLR(1) Parser
                     parse = false;
                     break;
                 case SHIFT:
-                    stack.push(new Pair<>(new ParseTree(grammar.getTerminal(input.next())), a.state));
+                    stack.push(new Pair<>(new ParseTree(grammar.getTerminal(input.peek()), input.next()), a.state));
                     break;
                 case REDUCE:
                     ParseTree[] children = new ParseTree[a.item.index];
@@ -59,7 +59,7 @@ public class Parser // SLR(1) Parser
                     break;
                 case ERROR:
                 default:
-                    throw new RuntimeException("Parsing Error!");
+                    throw new RuntimeException("Parsing Error! Unexpected " + input.peek());
             }
         }
         stack.get(1).getKey().removeRedundant();

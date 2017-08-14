@@ -26,13 +26,14 @@ public class Token
         COMMA(","),
         SEMICOLON(";"),
         END("$"),
-        CLASS("class"); // remove
-
+        CLASS("class"),
+        TRUE("true"),
+        FALSE("false");
         // temporary
         public Terminal t;
         Type(String name) {
-            t = new Terminal(name, this);
             if (name.equals("$")) t = Terminal.END_OF_INPUT;
+            else t = new Terminal(name, this);
         }
     }
 

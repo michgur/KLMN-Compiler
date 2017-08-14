@@ -9,39 +9,44 @@ import parsing.slr.Parser;
  */
 public class Main
 {
-    // todo: create new exceptions for each phase of compiling
+    // Parsing Is The Only General Phrase Of Compilation Since It's Virtually Impossible To Implement Specifically.
+
+    // Some TODOs:
+    //      Create New Exceptions For Each Phase Of Compiling
+    //      Improve The Symbol/ Terminal System, And Its Interaction With Tokens & Token Types
+    //      Merge Symbol/ Token System To Avoid Repetition. Use This As A Chance To Generalize Tokenizing.
+    //      Merge AST With Symbol Productions.
+    //      These 'Merges' Don't Necessarily Mean Put Everything In A Single Class, But
+    //          The Classes Have To Be Bound Somehow For Generalizing & Avoiding Repetition.
+    //      After That Shite Is Done, Go Over The Code In Parser & Grammar, And Clean It.
+    //          Add Some Documentation In Complicated Parts.
     public static void main(String[] args) {
-        String code = "int a#poo\n = 1 + 2;int b = 3 * (1 + 2 - (5 * 6 / (7-2)) * 2) + 2;" +
+        String code =
                 "class poo {" +
                 "   void poopoo {" +
-                "       int a = 2; # some clever remark\n" +
+                "       int a = (\"poo\" + \"poo\")[23.12 + 5 * 4] + 2 ; # some clever remark\n" +
                 "   }" +
                 "}";
         TokenStream t = new TokenStream(code);
 
         Symbol S = new Symbol("STMT"), B = new Symbol("BLOCK"),
-                E = new Symbol("EXPR"), T = new Symbol("T"), F = new Symbol("F");
+                E = new Symbol("EXPR"), T = new Symbol("T"), F = new Symbol("F"), O = new Symbol("O");
 
-        B.addProduction();
-        B.addProduction(Terminal.END_OF_INPUT); // required for empty input. not ideal, but fixing it will be a pain.
-        B.addProduction(S);
-        B.addProduction(B, S);
+        B.addProduction().addProduction(Terminal.END_OF_INPUT).addProduction(S).addProduction(B, S);
+        O.addProduction(Token.Type.NUMBER.t).addProduction(Token.Type.IDENTIFIER.t)
+        .addProduction(Token.Type.STRING.t).addProduction(Token.Type.TRUE.t).addProduction(Token.Type.FALSE.t);
         // type name = EXPR ;
         S.addProduction(Token.Type.IDENTIFIER.t, Token.Type.IDENTIFIER.t, Token.Type.EQUALS.t, E, Token.Type.SEMICOLON.t);
-        E.addProduction(T);
-        E.addProduction(E, Token.Type.PLUS.t, T);
-        E.addProduction(E, Token.Type.DASH.t, T);
-        T.addProduction(T, Token.Type.ASTERISK.t, F);
-        T.addProduction(T, Token.Type.SLASH.t, F);
-        T.addProduction(F);
-        F.addProduction(Token.Type.OPEN_PAREN.t, E, Token.Type.CLOSE_PAREN.t);
-        F.addProduction(Token.Type.NUMBER.t);
+        E.addProduction(T).addProduction(E, Token.Type.OPEN_BRACKET.t, E, Token.Type.CLOSE_BRACKET.t)
+        .addProduction(E, Token.Type.PLUS.t, T).addProduction(E, Token.Type.DASH.t, T);
+        T.addProduction(T, Token.Type.ASTERISK.t, F).addProduction(T, Token.Type.SLASH.t, F).addProduction(F);
+        F.addProduction(Token.Type.OPEN_PAREN.t, E, Token.Type.CLOSE_PAREN.t).addProduction(O);
         // function definition
         // return_type name { BLOCK }
-        S.addProduction(Token.Type.IDENTIFIER.t, Token.Type.IDENTIFIER.t, Token.Type.OPEN_CURLY.t, B, Token.Type.CLOSE_CURLY.t);
+        S.addProduction(Token.Type.IDENTIFIER.t, Token.Type.IDENTIFIER.t, Token.Type.OPEN_CURLY.t, B, Token.Type.CLOSE_CURLY.t)
         // class definition
         // class name { BLOCK }
-        S.addProduction(Token.Type.CLASS.t, Token.Type.IDENTIFIER.t, Token.Type.OPEN_CURLY.t, B, Token.Type.CLOSE_CURLY.t);
+        .addProduction(Token.Type.CLASS.t, Token.Type.IDENTIFIER.t, Token.Type.OPEN_CURLY.t, B, Token.Type.CLOSE_CURLY.t);
 
         Grammar g = new Grammar(B);
         System.out.println(g);

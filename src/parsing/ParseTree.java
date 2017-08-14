@@ -1,5 +1,7 @@
 package parsing;
 
+import lex.Token;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,7 +14,13 @@ public class ParseTree
     private ParseTree parent;
     private List<ParseTree> children = new ArrayList<>();
     private Symbol symbol;
+    private Token token;
 
+    public ParseTree(Terminal symbol, Token token) { this(symbol, token, null); }
+    public ParseTree(Terminal symbol, Token token, ParseTree parent) {
+        this(symbol, parent);
+        this.token = token;
+    }
     public ParseTree(Symbol symbol) { this(symbol, null); }
     public ParseTree(Symbol symbol, ParseTree parent) {
         this.symbol = symbol;
@@ -62,11 +70,13 @@ public class ParseTree
         return s.toString();
     }
     private void toString(StringBuilder s, String prefix, boolean last) {
+        String t = symbol.toString();
+        if (token != null && !token.getValue().equals(t)) t += " \"" + token.getValue() + '"';
         if (children.size() == 0) {
-            s.append(prefix).append((last) ? "\\-" : "|-").append('[').append(symbol).append("]\n");
+            s.append(prefix).append((last) ? "\\-" : "|-").append('[').append(t).append("]\n");
             return;
         }
-        s.append(prefix).append((last) ? "\\-" : "|-").append(symbol).append('\n');
+        s.append(prefix).append((last) ? "\\-" : "|-").append(t).append('\n');
         prefix += (last) ? "  " : "| ";
         for (int i = 0; i < children.size() - 1; i++) children.get(i).toString(s, prefix, false);
         children.get(children.size() - 1).toString(s, prefix, true);
