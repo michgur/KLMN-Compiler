@@ -1,6 +1,6 @@
 package ast;
 
-import lex.Token;
+import lang.Token;
 
 /**
  * ಠ^ಠ.

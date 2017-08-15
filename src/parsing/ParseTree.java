@@ -1,13 +1,20 @@
 package parsing;
 
-import lex.Token;
+import ast.AST;
+import lang.Production;
+import lang.Symbol;
+import lang.Terminal;
+import lang.Token;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * ಠ^ಠ.
  * Created by Michael on 8/6/2017.
+ *
+ * I'm going to skip this, and generate ASTs
  */
 public class ParseTree
 {
@@ -27,10 +34,6 @@ public class ParseTree
         this.parent = parent;
     }
 
-    public void expand(Symbol[] rule) {
-        if (!symbol.getProductions().contains(rule)) return;
-        for (Symbol t : rule) children.add(new ParseTree(t, this));
-    }
     public static ParseTree reduce(ParseTree[] rule, Symbol reduce) {
         ParseTree res = new ParseTree(reduce);
         for (ParseTree t : rule) {
@@ -64,6 +67,20 @@ public class ParseTree
 
     public Symbol getSymbol() { return symbol; }
     public Token getValue() { return token; }
+
+    public Production getProduction() {
+        if (children.size() == 0) return null;
+        Symbol[] s = new Symbol[children.size()];
+        for (int i = 0; i < s.length; i++) s[i] = children.get(i).getSymbol();
+        for (Production p : symbol.getProductions())
+            if (Arrays.equals(p.getValue(), s)) return p;
+        return null;
+    }
+    public AST generateAST() {
+        Production p = getProduction();
+        if (p == null) return new AST(getValue());
+        return getProduction().generateAST(this);
+    }
 
     @Override
     public String toString() {

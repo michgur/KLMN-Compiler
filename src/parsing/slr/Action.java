@@ -2,10 +2,9 @@ package parsing.slr;
 
 import automata.DFA;
 import javafx.util.Pair;
-import lex.Token;
-import parsing.Grammar;
-import parsing.Symbol;
-import parsing.Terminal;
+import lang.Grammar;
+import lang.Symbol;
+import lang.Terminal;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,13 +32,13 @@ class Action // SLR(1) Action
             for (int i = 0; i < dfa.size(); i++) {
                 Pair<Integer, Terminal> pair = new Pair<>(i, t);
                 for (Item item : dfa.getState(i)) {
-                    if (!item.canReduce() && t == item.production[item.index]) {
+                    if (!item.canReduce() && t == item.production.getValue()[item.index]) {
                         action.put(pair, new Action(Type.SHIFT, dfa.getTransition(i, t)));
                         break;
                     }
-                    else if (item.symbol == grammar.getStartSymbol() && item.canReduce())
+                    else if (item.production.getKey() == grammar.getStartSymbol() && item.canReduce())
                         action.put(pair, new Action(Type.ACCEPT));
-                    else if (item.canReduce() && grammar.followSet(item.symbol).contains(t)) {
+                    else if (item.canReduce() && grammar.followSet(item.production.getKey()).contains(t)) {
                         action.put(pair, new Action(Type.REDUCE, item));
                     }
                 }

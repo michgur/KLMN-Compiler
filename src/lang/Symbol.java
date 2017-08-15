@@ -1,6 +1,4 @@
-package parsing;
-
-import lex.Token;
+package lang;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -13,21 +11,20 @@ public class Symbol
 {
     public static final Symbol EPSILON = new Symbol("ε");
 
-    private Set<Symbol[]> productions = new HashSet<>();
-    private String name; // only needed for debugging purposes
+    private Set<Production> productions = new HashSet<>();
+    protected String name; // only needed for debugging purposes
     boolean used = false;
 
     public Symbol(String name) { this.name = name; }
 
-    public final Symbol addProduction(Symbol... p) {
+    public final Symbol addProduction(Production.ASTGenerator generator, Symbol... p) {
         if (used) throw new IllegalStateException("Cannot Modify Symbol " + name + " After Constructing Grammar!");
-        productions.add(p);
+        productions.add(new Production(generator, this, p));
         return this;
     }
-    public Set<Symbol[]> getProductions() { return productions; }
+    public Set<Production> getProductions() { return productions; }
 
     public boolean isTerminal() { return false; }
-    public boolean matches(Token t) { throw new IllegalStateException("Symbol " + name + " is Not a Terminal, Cannot Match Tokens"); }
 
     @Override
     public String toString() { return name; }

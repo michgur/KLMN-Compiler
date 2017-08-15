@@ -1,8 +1,7 @@
 import ast.AST;
 import javafx.util.Pair;
-import lex.TokenStream;
+import lang.*;
 import parsing.*;
-import lex.Token;
 import parsing.slr.Parser;
 
 import java.util.Arrays;
@@ -27,16 +26,62 @@ public class Main
     //      After That Shite Is Done, Go Over The Code In Parser & Grammar, And Clean It.
     //          Add Some Documentation In Complicated Parts.
     public static void main(String[] args) {
+        Language KLMN = new Language();
+
         Terminal.END_OF_INPUT.isTerminal(); // it's stupid, will be removed when I refine the Symbol System
         String code = "((1 - 2) * 3) / 4 + 5 * 6";
-        TokenStream t = new TokenStream(code);
+        TokenStream t = KLMN.tokenize(code);
 
         Symbol E = new Symbol("EXPR"), T = new Symbol("T"), F = new Symbol("F");
+        Terminal plus = new Terminal("+"), minus = new Terminal("-"), times = new Terminal("*"),
+                divide = new Terminal("/"), open = new Terminal("("), close = new Terminal(")"),
+                number = new Terminal("num");
 
-        E.addProduction(T)//.addProduction(E, Token.Type.OPEN_BRACKET.t, E, Token.Type.CLOSE_BRACKET.t)
-        .addProduction(E, Token.Type.PLUS.t, T).addProduction(E, Token.Type.DASH.t, T);
-        T.addProduction(T, Token.Type.ASTERISK.t, F).addProduction(T, Token.Type.SLASH.t, F).addProduction(F);
-        F.addProduction(Token.Type.OPEN_PAREN.t, E, Token.Type.CLOSE_PAREN.t).addProduction(Token.Type.NUMBER.t);
+        KLMN.addTerminal(plus, '+').addTerminal(minus, '-').addTerminal(times, '*')
+        .addTerminal(divide, '/').addTerminal(open, '(').addTerminal(close, ')')
+        .addTerminal(number, (src, i) -> {
+            if (!Character.isDigit(src.charAt(i))) return null;
+            StringBuilder value = new StringBuilder().append(src.charAt(i));
+            boolean dot = false;
+            while (++i < src.length()) {
+                char c = code.charAt(i);
+                if (c == '.' && !dot) {
+                    dot = true;
+                    value.append('.');
+                }
+                else if (Character.isDigit(c)) value.append(c);
+                else break;
+            }
+            return value.toString();
+        });
+        KLMN.ignore((src, i) -> { // ignore spaces
+            char c = code.charAt(i);
+            if (c != ' ' && c != '\n' && c != '\t') return null;
+            StringBuilder value = new StringBuilder().append(src.charAt(i));
+            while (++i < src.length()) {
+                c = code.charAt(i);
+                if (c == ' ' || c == '\n' || c == '\t') value.append(c);
+                else break;
+            }
+            return value.toString();
+        });
+        KLMN.ignore((src, i) -> { // ignore comments
+            if (src.charAt(i) != '#') return null;
+            int end = src.indexOf('\n', i);
+            if (end == -1) return src.substring(i);
+            else return src.substring(i, end + 1);
+        });
+
+        // the lambdas have destroyed the neat use of addProduction. find a fix
+        // everything will become twice as messy when we get to Code generation
+        E.addProduction(tree -> tree.getChild(0).generateAST(), T);
+        E.addProduction(tree -> new AST(tree.getChild(1).getValue(), tree.getChild(0).generateAST(), tree.getChild(2).generateAST()), E, plus, T);
+        E.addProduction(tree -> new AST(tree.getChild(1).getValue(), tree.getChild(0).generateAST(), tree.getChild(2).generateAST()), E, minus, T);
+        T.addProduction(tree -> new AST(tree.getChild(1).getValue(), tree.getChild(0).generateAST(), tree.getChild(2).generateAST()), T, times, F);
+        T.addProduction(tree -> new AST(tree.getChild(1).getValue(), tree.getChild(0).generateAST(), tree.getChild(2).generateAST()), T, divide, F);
+        T.addProduction(tree -> tree.getChild(0).generateAST(), F);
+        F.addProduction(tree -> tree.getChild(1).generateAST(), open, E, close);
+        F.addProduction(tree -> tree.getChild(0).generateAST(), number);
 
         Grammar g = new Grammar(E);
         System.out.println(g);
@@ -45,34 +90,6 @@ public class Main
         ParseTree parseTree = new Parser(g).parse(t);
         System.out.println(parseTree);
 
-        productions.put(new Pair<>(E, new Symbol[] { E, Token.Type.PLUS.t, T }),
-                tree -> new AST(tree.getChild(1).getValue(), generateAST(tree.getChild(0)), generateAST(tree.getChild(2))));
-        productions.put(new Pair<>(E, new Symbol[] { E, Token.Type.DASH.t, T }),
-                tree -> new AST(tree.getChild(1).getValue(), generateAST(tree.getChild(0)), generateAST(tree.getChild(2))));
-        productions.put(new Pair<>(E, new Symbol[] { T }), tree -> generateAST(tree.getChild(0)));
-        productions.put(new Pair<>(T, new Symbol[] { T, Token.Type.ASTERISK.t, F }),
-                tree -> new AST(tree.getChild(1).getValue(), generateAST(tree.getChild(0)), generateAST(tree.getChild(2))));
-        productions.put(new Pair<>(T, new Symbol[] { T, Token.Type.SLASH.t, F }),
-                tree -> new AST(tree.getChild(1).getValue(), generateAST(tree.getChild(0)), generateAST(tree.getChild(2))));
-        productions.put(new Pair<>(T, new Symbol[] { F }), tree -> generateAST(tree.getChild(0)));
-        productions.put(new Pair<>(F, new Symbol[] { Token.Type.NUMBER.t }), tree -> generateAST(tree.getChild(0)));
-        productions.put(new Pair<>(F, new Symbol[] { Token.Type.OPEN_PAREN.t, E, Token.Type.CLOSE_PAREN.t }),
-                tree -> generateAST(tree.getChild(1)));
-
-        System.out.println(generateAST(parseTree));
+        System.out.println(parseTree.generateAST());
     }
-
-    private static Map<Pair<Symbol, Symbol[]>, Production> productions = new HashMap<>();
-    private static AST generateAST(ParseTree tree) {
-        if (tree.getSymbol().isTerminal()) return new AST(tree.getValue());
-
-        Symbol[] p = new Symbol[tree.getChildren().size()];
-        for (int i = 0; i < p.length; i++) p[i] = tree.getChildren().get(i).getSymbol();
-        for (Pair<Symbol, Symbol[]> production : productions.keySet())
-            if (production.getKey() == tree.getSymbol() && Arrays.equals(p, production.getValue()))
-                return productions.get(production).generate(tree);
-        System.out.println("Could Not Find Production: " + tree.getSymbol() + " -> " + Arrays.toString(p));
-        return null;
-    }
-    public interface Production { AST generate(ParseTree tree); }
 }

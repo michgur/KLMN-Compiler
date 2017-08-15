@@ -1,6 +1,7 @@
 package parsing.slr;
 
-import parsing.Symbol;
+import lang.Production;
+import lang.Symbol;
 
 import java.util.Arrays;
 
@@ -10,26 +11,24 @@ import java.util.Arrays;
  */
 class Item
 {
-    Symbol symbol;
-    Symbol[] production;
+    Production production;
     int index;
 
-    Item(Symbol symbol, Symbol[] production, Integer index) {
-        this.symbol = symbol;
+    Item(Production production, Integer index) {
         this.production = production;
         this.index = index;
     }
-    Item next() { return new Item(symbol, production, index + 1); } // does not check for index out of bound
+    Item next() { return new Item(production, index + 1); } // does not check for index out of bound
 
-    boolean canReduce() { return index == production.length; }
+    boolean canReduce() { return index == production.getValue().length; }
 
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
-        s.append(symbol).append("-> ");
-        for (int i = 0; i < production.length; i++) {
+        s.append(production.getKey()).append("-> ");
+        for (int i = 0; i < production.getValue().length; i++) {
             if (i == index) s.append('.');
-            s.append(production[i]);
+            s.append(production.getValue()[i]);
         } if (canReduce()) s.append('.');
         return s.toString();
     }
@@ -37,14 +36,12 @@ class Item
     @Override
     public boolean equals(Object o) {
         return o instanceof Item &&
-                ((Item) o).symbol == symbol &&
-                ((Item) o).index == index &&
-                Arrays.equals(production, ((Item) o).production);
+                ((Item) o).production.equals(production) &&
+                ((Item) o).index == index;
     }
     @Override
     public int hashCode() {
-        int result = symbol != null ? symbol.hashCode() : 0;
-        result = 31 * result + Arrays.hashCode(production);
+        int result = production != null ? production.hashCode() : 0;
         result = 31 * result + index;
         return result;
     }

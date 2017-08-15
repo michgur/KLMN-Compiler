@@ -1,13 +1,11 @@
-package parsing;
-
-import lex.Token;
+package lang;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import static parsing.Terminal.*;
+import static lang.Terminal.*;
 
 /**
  * ಠ^ಠ.
@@ -18,12 +16,11 @@ public class Grammar
     private Set<Symbol> symbols = new HashSet<>();
     private Symbol start;
 
-    private Map<Symbol[], Symbol> rules = new HashMap<>();
     private Map<Symbol, Set<Symbol>> firstSets = new HashMap<>(), followSets = new HashMap<>();
 
     public Grammar(Symbol start) {
         this.start = new Symbol("S'");
-        this.start.addProduction(start);
+        this.start.addProduction(tree -> tree.getChild(0).generateAST(), start);
         add(this.start);
 
         symbols.add(END_OF_INPUT);
@@ -46,29 +43,15 @@ public class Grammar
     public Set<Symbol> firstSet(Symbol symbol) { return firstSets.get(symbol); }
     public Set<Symbol> followSet(Symbol symbol) { return followSets.get(symbol); }
 
-    public Symbol reduce(Symbol... symbols) { return rules.get(symbols); }
-
     public Terminal getTerminal(Token t) {
-        for (Symbol s : symbols) if (s.isTerminal() && s.matches(t)) return (Terminal) s;
+        for (Symbol s : symbols) if (s.isTerminal() && s == t.getType()) return (Terminal) s;
         return null;
     }
 
     private void add(Symbol symbol) {
         symbol.used = true;
-        for (Symbol[] rule : symbol.getProductions()) {
-            rules.put(rule, symbol);
-            for (Symbol child : rule) if (symbols.add(child)) add(child);
-        }
-    }
-
-    public Set<Symbol> firstSet(Symbol[] s) {
-        Set<Symbol> first = new HashSet<>();
-        for (Symbol value : s) {
-            Set<Symbol> t = firstSet(value);
-            first.addAll(t);
-            if (!t.contains(EPSILON)) break;
-        }
-        return first;
+        for (Production rule : symbol.getProductions())
+            for (Symbol child : rule.getValue()) if (symbols.add(child)) add(child);
     }
 
     private Set<Symbol> generateFirstSet(Symbol symbol) {
@@ -78,12 +61,12 @@ public class Grammar
             firstSets.get(symbol).add(symbol);
             return firstSets.get(symbol);
         }
-        for (Symbol[] rule : symbol.getProductions()) {
+        for (Production rule : symbol.getProductions()) {
             int i = 0;
-            for (; i < rule.length; i++)
-                if (!generateFirstSet(rule[i]).contains(EPSILON)) break;
-            if (i == rule.length) firstSets.get(symbol).add(EPSILON);
-            else firstSets.get(symbol).addAll(firstSet(rule[i]));
+            for (; i < rule.getValue().length; i++)
+                if (!generateFirstSet(rule.getValue()[i]).contains(EPSILON)) break;
+            if (i == rule.getValue().length) firstSets.get(symbol).add(EPSILON);
+            else firstSets.get(symbol).addAll(firstSet(rule.getValue()[i]));
         }
         return firstSets.get(symbol);
     }
@@ -95,19 +78,19 @@ public class Grammar
         while (change) {
             change = false;
             for (Symbol symbol : symbols)
-                for (Symbol[] rule : symbol.getProductions()) {
+                for (Production rule : symbol.getProductions()) {
                     boolean end = true; // whether the current symbol in iteration can appear at the end of the production
                     Set<Symbol> first = new HashSet<>(); // first set of all symbols that come after each symbol in iteration
-                    for (int i = rule.length - 1; i >= 0; i--) {
-                        if (rule[i] == EPSILON) continue;
-                        if (end && followSets.get(rule[i]).addAll(followSets.get(symbol))) change = true;
+                    for (int i = rule.getValue().length - 1; i >= 0; i--) {
+                        if (rule.getValue()[i] == EPSILON) continue;
+                        if (end && followSets.get(rule.getValue()[i]).addAll(followSets.get(symbol))) change = true;
 
-                        if (followSets.get(rule[i]).addAll(first)) change = true;
-                        if (!firstSet(rule[i]).contains(EPSILON)) {
+                        if (followSets.get(rule.getValue()[i]).addAll(first)) change = true;
+                        if (!firstSet(rule.getValue()[i]).contains(EPSILON)) {
                             end = false;
                             first.clear();
                         }
-                        first.addAll(firstSet(rule[i]));
+                        first.addAll(firstSet(rule.getValue()[i]));
                     }
                 }
         }
@@ -121,8 +104,8 @@ public class Grammar
             if (symbol.isTerminal() || symbol == start) continue;
 
             s.append(symbol).append(" -> ");
-            for (Symbol[] rule : symbol.getProductions()) {
-                for (Symbol child : rule) s.append(child);
+            for (Production rule : symbol.getProductions()) {
+                for (Symbol child : rule.getValue()) s.append(child);
                 s.append(" | ");
             }
             s.delete(s.length() - 3, s.length()).append('\n');
