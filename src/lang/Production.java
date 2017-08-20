@@ -2,7 +2,6 @@ package lang;
 
 import ast.AST;
 import javafx.util.Pair;
-import parsing.ParseTree;
 
 /**
  * ಠ^ಠ.
@@ -16,9 +15,7 @@ public class Production extends Pair<Symbol, Symbol[]>
         this.generator = generator;
     }
 
-    public AST generateAST(ParseTree tree) { return generator.generate(tree); }
+    public AST generateAST(AST[] children) { return generator.generate(children); }
 
-    // eventually, this will be called with Tokens, not ParseTrees,
-    // since we're skipping CST generation
-    public interface ASTGenerator { AST generate(ParseTree tree); }
+    public interface ASTGenerator { AST generate(AST[] children); }
 }

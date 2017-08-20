@@ -1,10 +1,10 @@
-package parsing.slr;
+package parsing;
 
+import ast.AST;
 import automata.DFA;
 import automata.NFA;
 import javafx.util.Pair;
 import lang.*;
-import parsing.ParseTree;
 
 import java.util.*;
 
@@ -34,33 +34,27 @@ public class Parser // SLR(1) Parser
 
     public DFA<Item, Symbol> getDFA() { return dfa; }
 
-    public ParseTree parse(TokenStream input) {
-        Stack<Pair<ParseTree, Integer>> stack = new Stack<>();
+    public AST parse(TokenStream input) {
+        Stack<Pair<AST, Integer>> stack = new Stack<>();
         stack.push(new Pair<>(null, 0));
 
-        boolean parse = true;
-        while (parse) {
+        while (true) {
             Action a = action.get(new Pair<>(stack.peek().getValue(), grammar.getTerminal(input.peek())));
             switch (a.type) {
-                case ACCEPT:
-                    parse = false;
-                    break;
                 case SHIFT:
-                    stack.push(new Pair<>(new ParseTree(grammar.getTerminal(input.peek()), input.next()), a.state));
+                    stack.push(new Pair<>(new AST(input.peek()), a.state));
+                    input.next();
                     break;
                 case REDUCE:
-                    ParseTree[] children = new ParseTree[a.item.index];
-                    for (int i = 0; i < children.length; i++) children[children.length - 1 - i] = stack.pop().getKey();
-                    stack.push(new Pair<>(ParseTree.reduce(children, a.item.production.getKey()),
+                    AST[] p = new AST[a.item.index];
+                    for (int i = p.length - 1; i >= 0; i--) p[i] = stack.pop().getKey();
+                    stack.push(new Pair<>(a.item.production.generateAST(p),
                             dfa.getTransition(stack.peek().getValue(), a.item.production.getKey())));
                     break;
-                case ERROR:
-                default:
-                    throw new RuntimeException("Parsing Error! Unexpected " + input.peek());
+                case ACCEPT: return stack.get(1).getKey();
+                case ERROR: throw new RuntimeException("Parsing Error! Unexpected Token " + input.peek());
             }
         }
-        stack.get(1).getKey().removeRedundant();
-        return stack.get(1).getKey();
     }
 
     private int generateState(NFA<Item, Symbol> nfa, Map<Item, Integer> items, Item item) {

@@ -1,12 +1,6 @@
 import ast.AST;
-import javafx.util.Pair;
 import lang.*;
-import parsing.*;
-import parsing.slr.Parser;
-
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import parsing.Parser;
 
 /**
  * ಠ^ಠ.
@@ -29,7 +23,7 @@ public class Main
         Language KLMN = new Language();
 
         Terminal.END_OF_INPUT.isTerminal(); // it's stupid, will be removed when I refine the Symbol System
-        String code = "((1 - 2) * 3) / 4 + 5 * 6";
+        String code = "(1.11 + 2) * 3 + ((3 + 2) - 4 / 3)";
         TokenStream t = KLMN.tokenize(code);
 
         Symbol E = new Symbol("EXPR"), T = new Symbol("T"), F = new Symbol("F");
@@ -74,22 +68,19 @@ public class Main
 
         // the lambdas have destroyed the neat use of addProduction. find a fix
         // everything will become twice as messy when we get to Code generation
-        E.addProduction(tree -> tree.getChild(0).generateAST(), T);
-        E.addProduction(tree -> new AST(tree.getChild(1).getValue(), tree.getChild(0).generateAST(), tree.getChild(2).generateAST()), E, plus, T);
-        E.addProduction(tree -> new AST(tree.getChild(1).getValue(), tree.getChild(0).generateAST(), tree.getChild(2).generateAST()), E, minus, T);
-        T.addProduction(tree -> new AST(tree.getChild(1).getValue(), tree.getChild(0).generateAST(), tree.getChild(2).generateAST()), T, times, F);
-        T.addProduction(tree -> new AST(tree.getChild(1).getValue(), tree.getChild(0).generateAST(), tree.getChild(2).generateAST()), T, divide, F);
-        T.addProduction(tree -> tree.getChild(0).generateAST(), F);
-        F.addProduction(tree -> tree.getChild(1).generateAST(), open, E, close);
-        F.addProduction(tree -> tree.getChild(0).generateAST(), number);
+        E.addProduction(c -> c[0], T);
+        E.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), E, plus, T);
+        E.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), E, minus, T);
+        T.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), T, times, F);
+        T.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), T, divide, F);
+        T.addProduction(c -> c[0], F);
+        F.addProduction(c -> c[1], open, E, close);
+        F.addProduction(c -> c[0], number);
 
         Grammar g = new Grammar(E);
         System.out.println(g);
         System.out.println();
 
-        ParseTree parseTree = new Parser(g).parse(t);
-        System.out.println(parseTree);
-
-        System.out.println(parseTree.generateAST());
+        System.out.println(new Parser(g).parse(t));
     }
 }

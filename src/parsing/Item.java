@@ -1,9 +1,6 @@
-package parsing.slr;
+package parsing;
 
 import lang.Production;
-import lang.Symbol;
-
-import java.util.Arrays;
 
 /**
  * ಠ^ಠ.

@@ -1,4 +1,4 @@
-package parsing.slr;
+package parsing;
 
 import automata.DFA;
 import javafx.util.Pair;

@@ -15,12 +15,13 @@ public class Grammar
 {
     private Set<Symbol> symbols = new HashSet<>();
     private Symbol start;
+    private Map<Symbol[], Production> productions = new HashMap<>();
 
     private Map<Symbol, Set<Symbol>> firstSets = new HashMap<>(), followSets = new HashMap<>();
 
     public Grammar(Symbol start) {
         this.start = new Symbol("S'");
-        this.start.addProduction(tree -> tree.getChild(0).generateAST(), start);
+        this.start.addProduction(ast -> ast[0], start);
         add(this.start);
 
         symbols.add(END_OF_INPUT);
@@ -49,10 +50,14 @@ public class Grammar
     }
 
     private void add(Symbol symbol) {
-        symbol.used = true;
-        for (Production rule : symbol.getProductions())
+        symbol.modifiable = false;
+        for (Production rule : symbol.getProductions()) {
             for (Symbol child : rule.getValue()) if (symbols.add(child)) add(child);
+            productions.put(rule.getValue(), rule);
+        }
     }
+
+    public Production getProduction(Symbol... p) { return productions.get(p); }
 
     private Set<Symbol> generateFirstSet(Symbol symbol) {
         if (firstSets.putIfAbsent(symbol, new HashSet<>()) != null) return firstSets.get(symbol);
