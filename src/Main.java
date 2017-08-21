@@ -8,22 +8,22 @@ import parsing.Parser;
  */
 public class Main
 {
-    // Parsing Is The Only General Phase Of Compilation Since It's Virtually Impossible To Implement Specifically.
-
-    // Some TODOs:
-    //      Create New Exceptions For Each Phase Of Compiling
-    //      Improve The Symbol/ Terminal System, And Its Interaction With Tokens & Token Types
-    //      Merge Symbol/ Token Systems To Avoid Repetition. Use This As A Chance To Generalize Tokenizing.
-    //      Merge AST With Symbol Productions.
-    //      These 'Merges' Don't Necessarily Mean Put Everything In A Single Class, But
-    //          The Classes Have To Be Bound Somehow For Generalizing & Avoiding Repetition.
-    //      After That Shite Is Done, Go Over The Code In Parser & Grammar, And Clean It.
-    //          Add Some Documentation In Complicated Parts.
+    /**
+     * Parsing Is The Only Fully General Phase Of Compilation,
+     * Since It's Virtually Impossible To Implement Specifically.
+     *
+     * Some TODOs:
+     * UNMERGE AST With Symbol Productions.
+     * These 'Merges' Don't Necessarily Mean Put Everything In A Single Class, But
+     *      The Classes Have To Be Bound Somehow For Generalizing & Avoiding Repetition.
+     * After That Shite Is Done, Go Over The Code In Parser & Grammar, And Clean It.
+     * Add Some Documentation In Complicated Parts.
+    */
     public static void main(String[] args) {
+        // this class should be deleted FOR NOW, tokenizing should be implemented manually
         Language KLMN = new Language();
 
-        Terminal.END_OF_INPUT.isTerminal(); // it's stupid, will be removed when I refine the Symbol System
-        String code = "(1.11 + 2) * 3 + ((3 + 2) - 4 / 3)";
+        String code = "1 + (2 - 3) * 4 / (5 + 6)";
         TokenStream t = KLMN.tokenize(code);
 
         Symbol E = new Symbol("EXPR"), T = new Symbol("T"), F = new Symbol("F");
@@ -38,7 +38,7 @@ public class Main
             StringBuilder value = new StringBuilder().append(src.charAt(i));
             boolean dot = false;
             while (++i < src.length()) {
-                char c = code.charAt(i);
+                char c = src.charAt(i);
                 if (c == '.' && !dot) {
                     dot = true;
                     value.append('.');
@@ -49,11 +49,11 @@ public class Main
             return value.toString();
         });
         KLMN.ignore((src, i) -> { // ignore spaces
-            char c = code.charAt(i);
+            char c = src.charAt(i);
             if (c != ' ' && c != '\n' && c != '\t') return null;
             StringBuilder value = new StringBuilder().append(src.charAt(i));
             while (++i < src.length()) {
-                c = code.charAt(i);
+                c = src.charAt(i);
                 if (c == ' ' || c == '\n' || c == '\t') value.append(c);
                 else break;
             }
@@ -66,8 +66,12 @@ public class Main
             else return src.substring(i, end + 1);
         });
 
-        // the lambdas have destroyed the neat use of addProduction. find a fix
-        // everything will become twice as messy when we get to Code generation
+        // move the lambdas to the parser (Map Pair<Symbol, Symbol[]> to them)
+        // then again, not sure if this is a good solution either. the productions
+        // determine the AST node type, which is important for parsing, BUT
+        // ALSO for semantic analysis & code generation.
+        // I'll have to define some sort of an AST factory that the parser can use.
+        // stuff to consider: avoiding repetition, putting shit where it belongs
         E.addProduction(c -> c[0], T);
         E.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), E, plus, T);
         E.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), E, minus, T);
@@ -82,5 +86,7 @@ public class Main
         System.out.println();
 
         System.out.println(new Parser(g).parse(t));
+        System.out.println();
+        System.out.println("poopoo");
     }
 }

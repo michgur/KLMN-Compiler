@@ -17,6 +17,7 @@ public class Symbol
 
     public Symbol(String name) { this.name = name; }
 
+    public final void addProduction(Symbol... p) { addProduction(c -> c[0], p); } // not sure yet if this is a great idea
     public final void addProduction(Production.ASTGenerator generator, Symbol... p) {
         if (!modifiable) throw new IllegalStateException("Cannot Modify Symbol " + name + " After Constructing Grammar!");
         productions.add(new Production(generator, this, p));

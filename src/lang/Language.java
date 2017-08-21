@@ -10,7 +10,7 @@ import java.util.Set;
  * Created by Michael on 8/15/2017.
  *
  * This Class Manages A Grammar & Its Tokens
- * TODO: REMOVE THIS
+ * TODO: remove this silly little class, let user implement Tokenizer manually & more efficiently
  */
 public class Language
 {

@@ -32,8 +32,6 @@ public class Parser // SLR(1) Parser
         action = Action.generateActionMap(grammar, dfa);
     }
 
-    public DFA<Item, Symbol> getDFA() { return dfa; }
-
     public AST parse(TokenStream input) {
         Stack<Pair<AST, Integer>> stack = new Stack<>();
         stack.push(new Pair<>(null, 0));
@@ -52,7 +50,7 @@ public class Parser // SLR(1) Parser
                             dfa.getTransition(stack.peek().getValue(), a.item.production.getKey())));
                     break;
                 case ACCEPT: return stack.get(1).getKey();
-                case ERROR: throw new RuntimeException("Parsing Error! Unexpected Token " + input.peek());
+                case ERROR: throw new ParsingException(input.peek());
             }
         }
     }

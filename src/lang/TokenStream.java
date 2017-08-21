@@ -48,7 +48,7 @@ public class TokenStream implements Iterator<Token>
     private Token readNext() {
         if (index >= length) {
             end = true;
-            return new Token(Terminal.END_OF_INPUT, "$");
+            return new Token(Terminal.END_OF_INPUT, "EOF");
         }
         char c = code.charAt(index);
 
@@ -71,6 +71,7 @@ public class TokenStream implements Iterator<Token>
 
         index++;
         for (char op : lang.operators.keySet()) if (c == op) return new Token(lang.operators.get(c), c + "");
-        throw new RuntimeException("Error: Can't Handle Char " + c + " at " + index);
+
+        throw new ReadingException(c, index - 1);
     }
 }
