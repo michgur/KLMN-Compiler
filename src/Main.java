@@ -1,4 +1,5 @@
 import ast.AST;
+import ast.ASTFactory;
 import lang.*;
 import parsing.Parser;
 
@@ -13,7 +14,7 @@ public class Main
      * Since It's Virtually Impossible To Implement Specifically.
      *
      * Some TODOs:
-     * UNMERGE AST With Symbol Productions.
+     * DE-MERGE AST With Symbol Productions.
      * These 'Merges' Don't Necessarily Mean Put Everything In A Single Class, But
      *      The Classes Have To Be Bound Somehow For Generalizing & Avoiding Repetition.
      * After That Shite Is Done, Go Over The Code In Parser & Grammar, And Clean It.
@@ -72,21 +73,28 @@ public class Main
         // ALSO for semantic analysis & code generation.
         // I'll have to define some sort of an AST factory that the parser can use.
         // stuff to consider: avoiding repetition, putting shit where it belongs
-        E.addProduction(c -> c[0], T);
-        E.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), E, plus, T);
-        E.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), E, minus, T);
-        T.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), T, times, F);
-        T.addProduction(c -> new AST(c[1].getValue(), c[0], c[2]), T, divide, F);
-        T.addProduction(c -> c[0], F);
-        F.addProduction(c -> c[1], open, E, close);
-        F.addProduction(c -> c[0], number);
+        E.addProduction(T);
+        E.addProduction(E, plus, T);
+        E.addProduction(E, minus, T);
+        T.addProduction(T, times, F);
+        T.addProduction(T, divide, F);
+        T.addProduction(F);
+        F.addProduction(open, E, close);
+        F.addProduction(number);
+
+        new ASTFactory(c -> c[0], T);
+        new ASTFactory(c -> new AST(c[1].getValue(), c[0], c[2]), E, plus, T);
+        new ASTFactory(c -> new AST(c[1].getValue(), c[0], c[2]), E, minus, T);
+        new ASTFactory(c -> new AST(c[1].getValue(), c[0], c[2]), T, times, F);
+        new ASTFactory(c -> new AST(c[1].getValue(), c[0], c[2]), T, divide, F);
+        new ASTFactory(c -> c[0], F);
+        new ASTFactory(c -> c[1], open, E, close);
+        new ASTFactory(c -> c[0], number);
 
         Grammar g = new Grammar(E);
         System.out.println(g);
         System.out.println();
 
         System.out.println(new Parser(g).parse(t));
-        System.out.println();
-        System.out.println("poopoo");
     }
 }

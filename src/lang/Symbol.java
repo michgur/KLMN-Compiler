@@ -11,19 +11,18 @@ public class Symbol
 {
     public static final Symbol EPSILON = new Symbol("ε");
 
-    private Set<Production> productions = new HashSet<>();
-    boolean modifiable = true;
+    private Set<Symbol[]> productions = new HashSet<>();
     private String name; // only needed for debugging purposes
+    boolean modifiable = true; // changed when Symbol is passed to Grammar
 
     public Symbol(String name) { this.name = name; }
 
-    public final void addProduction(Symbol... p) { addProduction(c -> c[0], p); } // not sure yet if this is a great idea
-    public final void addProduction(Production.ASTGenerator generator, Symbol... p) {
+    public final void addProduction(Symbol... p) {
         if (!modifiable) throw new IllegalStateException("Cannot Modify Symbol " + name + " After Constructing Grammar!");
-        productions.add(new Production(generator, this, p));
+        productions.add(p);
     }
 
-    public Set<Production> getProductions() { return productions; }
+    public Set<Symbol[]> getProductions() { return productions; }
 
     public boolean isTerminal() { return false; }
 

@@ -1,6 +1,7 @@
 package parsing;
 
 import ast.AST;
+import ast.ASTFactory;
 import automata.DFA;
 import automata.NFA;
 import javafx.util.Pair;
@@ -24,9 +25,9 @@ public class Parser // SLR(1) Parser
         // items to NFA state indices
         Map<Item, Integer> items = new HashMap<>();
         NFA<Item, Symbol> nfa = new NFA<>();
-        Production start = null;
-        for (Production s : grammar.getStartSymbol().getProductions()) start = s;
-        generateState(nfa, items, new Item(start, 0));
+        Symbol[] start = null;
+        for (Symbol[] s : grammar.getStartSymbol().getProductions()) start = s;
+        generateState(nfa, items, new Item(grammar.getStartSymbol(), start, 0));
 
         dfa = nfa.toDFA();
         action = Action.generateActionMap(grammar, dfa);
@@ -46,8 +47,8 @@ public class Parser // SLR(1) Parser
                 case REDUCE:
                     AST[] p = new AST[a.item.index];
                     for (int i = p.length - 1; i >= 0; i--) p[i] = stack.pop().getKey();
-                    stack.push(new Pair<>(a.item.production.generateAST(p),
-                            dfa.getTransition(stack.peek().getValue(), a.item.production.getKey())));
+                    stack.push(new Pair<>(ASTFactory.getFactory(a.item.value).generate(p),
+                            dfa.getTransition(stack.peek().getValue(), a.item.key)));
                     break;
                 case ACCEPT: return stack.get(1).getKey();
                 case ERROR: throw new ParsingException(input.peek());
@@ -62,12 +63,12 @@ public class Parser // SLR(1) Parser
         nfa.acceptOn(index);
         if (item.canReduce()) return index;
 
-        Symbol symbol = item.production.getValue()[item.index];
-        if (item.index < item.production.getValue().length)
+        Symbol symbol = item.value[item.index];
+        if (item.index < item.value.length)
             nfa.addTransition(index, symbol, generateState(nfa, items, item.next()));
         if (!symbol.isTerminal())
-            for (Production rule : symbol.getProductions())
-                nfa.addTransition(index, generateState(nfa, items, new Item(rule, 0)));
+            for (Symbol[] rule : symbol.getProductions())
+                nfa.addTransition(index, generateState(nfa, items, new Item(symbol, rule, 0)));
 
         return index;
     }

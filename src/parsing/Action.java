@@ -32,13 +32,13 @@ class Action // SLR(1) Action
             for (int i = 0; i < dfa.size(); i++) {
                 Pair<Integer, Terminal> pair = new Pair<>(i, t);
                 for (Item item : dfa.getState(i)) {
-                    if (!item.canReduce() && t == item.production.getValue()[item.index]) {
+                    if (!item.canReduce() && t == item.value[item.index]) {
                         action.put(pair, new Action(Type.SHIFT, dfa.getTransition(i, t)));
                         break;
                     }
-                    else if (item.production.getKey() == grammar.getStartSymbol() && item.canReduce())
+                    else if (item.key == grammar.getStartSymbol() && item.canReduce())
                         action.put(pair, new Action(Type.ACCEPT));
-                    else if (item.canReduce() && grammar.followSet(item.production.getKey()).contains(t)) {
+                    else if (item.canReduce() && grammar.followSet(item.key).contains(t)) {
                         action.put(pair, new Action(Type.REDUCE, item));
                     }
                 }

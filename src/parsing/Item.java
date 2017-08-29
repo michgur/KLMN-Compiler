@@ -1,6 +1,8 @@
 package parsing;
 
-import lang.Production;
+import lang.Symbol;
+
+import java.util.Arrays;
 
 /**
  * ಠ^ಠ.
@@ -8,24 +10,26 @@ import lang.Production;
  */
 class Item
 {
-    Production production;
+    Symbol key;
+    Symbol[] value;
     int index;
 
-    Item(Production production, Integer index) {
-        this.production = production;
+    Item(Symbol symbol, Symbol[] production, Integer index) {
+        key = symbol;
+        value = production;
         this.index = index;
     }
-    Item next() { return new Item(production, index + 1); } // does not check for index out of bound
+    Item next() { return new Item(key, value, index + 1); } // does not check for index out of bound
 
-    boolean canReduce() { return index == production.getValue().length; }
+    boolean canReduce() { return index == value.length; }
 
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
-        s.append(production.getKey()).append("-> ");
-        for (int i = 0; i < production.getValue().length; i++) {
+        s.append(key).append("-> ");
+        for (int i = 0; i < value.length; i++) {
             if (i == index) s.append('.');
-            s.append(production.getValue()[i]);
+            s.append(value[i]);
         } if (canReduce()) s.append('.');
         return s.toString();
     }
@@ -33,13 +37,13 @@ class Item
     @Override
     public boolean equals(Object o) {
         return o instanceof Item &&
-                ((Item) o).production.equals(production) &&
+                ((Item) o).key.equals(key) &&
+                Arrays.equals(((Item) o).value, value) &&
                 ((Item) o).index == index;
     }
     @Override
     public int hashCode() {
-        int result = production != null ? production.hashCode() : 0;
-        result = 31 * result + index;
-        return result;
+        return 31 * (31 * (key != null ? key.hashCode() : 0)
+                + Arrays.hashCode(value)) + index;
     }
 }
