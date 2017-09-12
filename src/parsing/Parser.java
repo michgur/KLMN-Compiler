@@ -33,7 +33,7 @@ public class Parser // SLR(1) Parser
         action = Action.generateActionMap(grammar, dfa);
     }
 
-    public AST parse(TokenStream input) {
+    public AST parse(TokenStream input, ASTFactory factory) {
         Stack<Pair<AST, Integer>> stack = new Stack<>();
         stack.push(new Pair<>(null, 0));
 
@@ -41,13 +41,15 @@ public class Parser // SLR(1) Parser
             Action a = action.get(new Pair<>(stack.peek().getValue(), grammar.getTerminal(input.peek())));
             switch (a.type) {
                 case SHIFT:
-                    stack.push(new Pair<>(new AST(input.peek()), a.state));
+                    stack.push(new Pair<>(new AST(input.peek()) {
+                        @Override public String generateCode() { return getValue().getValue(); }
+                    }, a.state));
                     input.next();
                     break;
                 case REDUCE:
                     AST[] p = new AST[a.item.index];
                     for (int i = p.length - 1; i >= 0; i--) p[i] = stack.pop().getKey();
-                    stack.push(new Pair<>(ASTFactory.getFactory(a.item.value).generate(p),
+                    stack.push(new Pair<>(factory.generate(a.item.key, a.item.value, p),
                             dfa.getTransition(stack.peek().getValue(), a.item.key)));
                     break;
                 case ACCEPT: return stack.get(1).getKey();

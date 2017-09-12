@@ -1,7 +1,5 @@
 package lang;
 
-import ast.ASTFactory;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -23,7 +21,6 @@ public class Grammar
     public Grammar(Symbol start) {
         this.start = new Symbol("S'");
         this.start.addProduction(start);
-        new ASTFactory(ast -> ast[0], start);
         add(this.start);
 
         symbols.add(END_OF_INPUT);

@@ -6,7 +6,7 @@ import lang.Token;
  * ಠ^ಠ.
  * Created by Michael on 8/14/2017.
  */
-public class AST
+public abstract class AST
 {
     private Token value;
     private AST[] children;
@@ -15,6 +15,8 @@ public class AST
         this.value = value;
         this.children = children;
     }
+
+    public abstract String generateCode();
 
     public Token getValue() { return value; }
     public AST[] getChildren() { return children; }

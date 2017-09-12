@@ -1,7 +1,5 @@
 package lang;
 
-import lang.Token;
-
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -60,7 +58,10 @@ public class TokenStream implements Iterator<Token>
             return next();
         }
         for (String kw : lang.keywords.keySet())
-            if (code.startsWith(kw, index)) return new Token(lang.keywords.get(kw), kw);
+            if (code.startsWith(kw, index)) {
+                index += kw.length();
+                return new Token(lang.keywords.get(kw), kw);
+            }
         for (Language.Tokenizer t : lang.others.keySet()) {
             String value = t.read(code, index);
             if (value == null) continue;
