@@ -219,11 +219,12 @@ public class Main
         factory.addProduction(F, new Symbol[] { identifier }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
             @Override public String generateCode() { return "push #" + getValue().getValue() + '\n'; }
         });
+        final int[] skip = { 0 };
         factory.addProduction(S, new Symbol[] { kwIf, open, E, close, S }, c ->
             new AST(c[0].getValue(), c[2], c[4]) {
                 @Override public String generateCode() {
                     return getChildren()[0].generateCode() +
-                            "pop #0l\nje 0 #0l skip\n" + getChildren()[1].generateCode() + ":skip\n";
+                            "pop #0l\nje 0 #0l skip" + skip[0] + '\n' + getChildren()[1].generateCode() + ":skip" + skip[0]++ + '\n';
                 }
             }
         );
