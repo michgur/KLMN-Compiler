@@ -13,6 +13,14 @@ import java.nio.file.Paths;
  */
 public class Main
 {
+    // TODO:::
+    // TODO:::  OK, I've successfully demonstrated that code generation is possible.
+    // TODO:::  Now, I have to focus on learning how to actually manage the semantics,
+    // TODO:::  do shit like variables, memory management, functions, type checking,
+    // TODO:::  contexts, and equally importantly a proper platform for generated code
+    // TODO:::  (the VM is hilarious but not really useful / efficient in any way).
+    // TODO:::
+
     /* 💩💩💩 AMAZING 💩💩💩 */
     public static void main(String[] args) throws Exception {
         // this class should be deleted FOR NOW, tokenizing should be implemented manually
