@@ -1,7 +1,5 @@
 package test;
 
-import ast.AST;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,9 +17,12 @@ import java.util.Stack;
  */
 public class KVM
 {
+    // TODO: add jumps & conditions
     private static Map<String, Command> commands = new HashMap<>();
+    private static Map<String, Integer> labels = new HashMap<>();
     private static Map<String, Double> vars = new HashMap<>();
     private static Stack<Double> stack = new Stack<>();
+    private static int instruction = -1; // instruction pointer (<("0")> JUST LIKE ASM!!! <("0")>)
 
     static {
         commands.put("print", (String... args) -> {
@@ -31,14 +32,29 @@ public class KVM
         commands.put("put", (String... args) -> vars.put(args[0], parseArg(args[1])));
         commands.put("add", (String... args) -> vars.put(args[0], vars.get(args[0]) + parseArg(args[1])));
         commands.put("sub", (String... args) -> vars.put(args[0], vars.get(args[0]) - parseArg(args[1])));
+        commands.put("rsub", (String... args) -> vars.put(args[0], parseArg(args[1]) - vars.get(args[0])));
         commands.put("mul", (String... args) -> vars.put(args[0], vars.get(args[0]) * parseArg(args[1])));
         commands.put("div", (String... args) -> vars.put(args[0], vars.get(args[0]) / parseArg(args[1])));
+        commands.put("rdiv", (String... args) -> vars.put(args[0], parseArg(args[1]) / vars.get(args[0])));
         commands.put("del", (String... args) -> vars.remove(args[0]));
         commands.put("push", (String... args) -> stack.push(parseArg(args[0])));
         commands.put("pop", (String... args) -> {
             double i = stack.pop();
             if (args.length > 0) vars.put(args[0], i);
         });
+        commands.put("jmp", (String... args) -> instruction = labels.get(args[0]));
+        commands.put("je", (String... args) -> { if (parseArg(args[0]) == parseArg(args[1])) instruction = labels.get(args[2]); });
+        commands.put("jne", (String... args) -> { if (parseArg(args[0]) != parseArg(args[1])) instruction = labels.get(args[2]); });
+        commands.put("jl", (String... args) -> { if (parseArg(args[0]) > parseArg(args[1])) instruction = labels.get(args[2]); });
+        commands.put("jle", (String... args) -> { if (parseArg(args[0]) >= parseArg(args[1])) instruction = labels.get(args[2]); });
+        commands.put("js", (String... args) -> { if (parseArg(args[0]) < parseArg(args[1])) instruction = labels.get(args[2]); });
+        commands.put("jse", (String... args) -> { if (parseArg(args[0]) < parseArg(args[1])) instruction = labels.get(args[2]); });
+        commands.put("eq", (String... args) -> vars.put(args[0], parseArg(args[0]) == parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("neq", (String... args) -> vars.put(args[0], parseArg(args[0]) != parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("lt", (String... args) -> vars.put(args[0], parseArg(args[0]) < parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("gt", (String... args) -> vars.put(args[0], parseArg(args[0]) > parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("leq", (String... args) -> vars.put(args[0], parseArg(args[0]) <= parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("geq", (String... args) -> vars.put(args[0], parseArg(args[0]) >= parseArg(args[1]) ? 1.0 : 0.0));
     }
 
     private static double parseArg(String arg) {
@@ -49,8 +65,15 @@ public class KVM
     private KVM() {}
 
     public static void run(String code) {
-        for (String line : code.split("\n")) {
-            String[] words = line.split(" ");
+        System.out.println(">>> " + code.replace("\n", "\n>>> "));
+        instruction = -1;
+        String[] instructions = code.toLowerCase().split("\n");
+
+        for (int i = 0; i < instructions.length; i++)
+            if (instructions[i].startsWith(":")) labels.put(instructions[i].substring(1), i);
+        while (++instruction < instructions.length) {
+            if (instructions[instruction].startsWith(":")) continue;
+            String[] words = instructions[instruction].split(" ");
             try { commands.get(words[0]).run(Arrays.copyOfRange(words, 1, words.length)); }
             catch (Exception e) { throw new RuntimeException("KVM Error", e); }
         }
