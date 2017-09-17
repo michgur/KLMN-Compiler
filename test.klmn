@@ -1,5 +1,10 @@
 var a = 5;
-var b = 4;
-if (a < b) print a * b;
+var b = 6;
+var c = 4;
+if (a < b) {
+    var c = 2;
+    print c;
+}
+print c;
 if (a > b) print a / b;
 if (a == b) print a + b;

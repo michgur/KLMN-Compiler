@@ -3,6 +3,7 @@ import ast.ASTFactory;
 import lang.*;
 import parsing.Parser;
 import test.KVM;
+import test.SymbolTable;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -17,7 +18,7 @@ public class Main
     // TODO:::  OK, I've successfully demonstrated that code generation is possible.
     // TODO:::  Now, I have to focus on learning how to actually manage the semantics,
     // TODO:::  do shit like variables, memory management, functions, type checking,
-    // TODO:::  contexts, and equally importantly a proper platform for generated code
+    // TODO:::  scopes, and equally importantly a proper platform for generated code
     // TODO:::  (the VM is hilarious but not really useful / efficient in any way).
     // TODO:::
 
@@ -35,7 +36,8 @@ public class Main
                 divide = new Terminal("/"), open = new Terminal("("), close = new Terminal(")"),
                 number = new Terminal("num"), semicolon = new Terminal(";"),
                 equals = new Terminal("=="), nEquals = new Terminal("!="), less = new Terminal("<"),
-                greater = new Terminal(">"), lessEquals = new Terminal("<="), greaterEquals = new Terminal(">=");
+                greater = new Terminal(">"), lessEquals = new Terminal("<="), greaterEquals = new Terminal(">="),
+                openCurly = new Terminal("{"), closeCurly = new Terminal("}");
         Terminal assign = new Terminal("="), var = new Terminal("var"), print = new Terminal("print"),
         identifier = new Terminal("ID"), kwIf = new Terminal("if");
 
@@ -43,6 +45,7 @@ public class Main
         .addTerminal(minus, '-').addTerminal(times, '*')
         .addTerminal(divide, '/').addTerminal(open, '(').addTerminal(close, ')')
         .addTerminal(var, "var").addTerminal(print, "print").addTerminal(kwIf, "if")
+        .addTerminal(openCurly, '{').addTerminal(closeCurly, '}')
         .addTerminal(equals, "==").addTerminal(nEquals, "!=").addTerminal(less, '<')
         .addTerminal(greater, '>').addTerminal(lessEquals, "<=").addTerminal(greaterEquals, ">=")
         .addTerminal(number, (src, i) -> {
@@ -90,6 +93,7 @@ public class Main
 
         B.addProduction(S);
         B.addProduction(B, S);
+        S.addProduction(kwIf, open, E, close, openCurly, B, closeCurly);
         S.addProduction(var, identifier, assign, E, semicolon);
         S.addProduction(print, E, semicolon);
         S.addProduction(kwIf, open, E, close, S);
@@ -111,31 +115,57 @@ public class Main
         F.addProduction(number);
         F.addProduction(identifier);
 
+        SymbolTable st = new SymbolTable();
+        st.enterScope();
+        st.addSymbol("lll"); // index 0, temporary (registers will not be vars)
+        st.addSymbol("rrr"); // index 1, temporary (registers will not be vars)
+        final int[] skip = { 0 };
         ASTFactory factory = new ASTFactory();
-        factory.addProduction(B, new Symbol[] { S }, c -> new AST(new Token(new Terminal("Code"), "Code"), c) {
-            @Override public String generateCode() { return getChildren()[0].generateCode(); }
+        factory.addProduction(B, new Symbol[] { S }, c -> new AST(new Token(null, "Block"), c) {
+            @Override public String generateCode() {
+                st.enterScope();
+                String code = getChildren()[0].generateCode();
+                st.exitScope();
+                return code;
+            }
         });
         factory.addProduction(B, new Symbol[] { B, S }, c -> {
             AST[] children = new AST[c[0].getChildren().length + 1];
             System.arraycopy(c[0].getChildren(), 0, children, 0, c[0].getChildren().length);
             children[children.length - 1] = c[1];
-            return new AST(null, children) {
+            return new AST(new Token(null, "Block"), children) {
                 @Override public String generateCode() {
+                    st.enterScope();
                     StringBuilder s = new StringBuilder();
                     for (AST ast : getChildren()) s.append(ast.generateCode());
+                    st.exitScope();
                     return s.toString();
                 }
             };
         });
+        factory.addProduction(S, new Symbol[] { kwIf, open, E, close, openCurly, B, closeCurly }, c ->
+                new AST(c[0].getValue(), c[2], c[5]) {
+                    @Override public String generateCode() {
+                        st.enterScope();
+                        String body = getChildren()[1].generateCode();
+                        st.exitScope();
+                        return getChildren()[0].generateCode() +
+                            "pop #0\nje 0 #0 skip" + skip[0] + '\n' + body + ":skip" + skip[0]++ + '\n';
+                    }
+                }
+        );
         factory.addProduction(S, new Symbol[] { var, identifier, assign, E, semicolon }, c ->
         new AST(c[2].getValue(), c[1], c[3]) {
             @Override public String generateCode() {
-                return getChildren()[1].generateCode() + "pop #" + getChildren()[0].getValue().getValue() + '\n';
+                String name = getChildren()[0].getValue().getValue();
+                if (st.checkScope(name)) throw new RuntimeException("variable " + name + " already defined!");
+                st.addSymbol(name);
+                return getChildren()[1].generateCode() + "pop #" + st.findSymbol(name) + '\n';
             }
         });
         factory.addProduction(S, new Symbol[] { print, E, semicolon }, c -> new AST(c[0].getValue(), c[1]) {
             @Override public String generateCode() {
-                return getChildren()[0].generateCode() + "pop #0r\nprint #0r\n";
+                return getChildren()[0].generateCode() + "pop #1\nprint #1\n";
             }
         });
         factory.addProduction(E, new Symbol[] { T2 }, c -> c[0]);
@@ -143,42 +173,42 @@ public class Main
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public String generateCode() {
                         return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                                "pop #0r\npop #0l\neq #0l #0r\npush #0l\n";
+                                "pop #1\npop #0\neq #0 #1\npush #0\n";
                     }
                 });
         factory.addProduction(E, new Symbol[] { E, nEquals, T2 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public String generateCode() {
                         return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                                "pop #0r\npop #0l\nneq #0l #0r\npush #0l\n";
+                                "pop #1\npop #0\nneq #0 #1\npush #0\n";
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, less, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public String generateCode() {
                         return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                                "pop #0r\npop #0l\nlt #0l #0r\npush #0l\n";
+                                "pop #1\npop #0\nlt #0 #1\npush #0\n";
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, greater, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public String generateCode() {
                         return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                                "pop #0r\npop #0l\ngt #0l #0r\npush #0l\n";
+                                "pop #1\npop #0\ngt #0 #1\npush #0\n";
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, lessEquals, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public String generateCode() {
                         return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                                "pop #0r\npop #0l\nleq #0l #0r\npush #0l\n";
+                                "pop #1\npop #0\nleq #0 #1\npush #0\n";
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, greaterEquals, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public String generateCode() {
                         return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                                "pop #0r\npop #0l\ngeq #0l #0r\npush #0l\n";
+                                "pop #1\npop #0\ngeq #0 #1\npush #0\n";
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T1 }, c -> c[0]);
@@ -187,28 +217,28 @@ public class Main
         c -> new AST(c[1].getValue(), c[0], c[2]) {
             @Override public String generateCode() {
                 return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                "pop #0r\npop #0l\nadd #0l #0r\npush #0l\n";
+                "pop #1\npop #0\nadd #0 #1\npush #0\n";
             }
         });
         factory.addProduction(T1, new Symbol[] { T1, minus, T },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public String generateCode() {
                         return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                                "pop #0r\npop #0l\nsub #0l #0r\npush #0l\n";
+                                "pop #1\npop #0\nsub #0 #1\npush #0\n";
                     }
                 });
         factory.addProduction(T, new Symbol[] { T, times, F },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public String generateCode() {
                         return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                                "pop #0r\npop #0l\nmul #0l #0r\npush #0l\n";
+                                "pop #1\npop #0\nmul #0 #1\npush #0\n";
                     }
                 });
         factory.addProduction(T, new Symbol[] { T, divide, F },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public String generateCode() {
                         return getChildren()[0].generateCode() + getChildren()[1].generateCode() +
-                                "pop #0r\npop #0l\ndiv #0l #0r\npush #0l\n";
+                                "pop #1\npop #0\ndiv #0 #1\npush #0\n";
                     }
                 });
         factory.addProduction(T, new Symbol[] { F }, c -> c[0]);
@@ -217,14 +247,13 @@ public class Main
             @Override public String generateCode() { return "push " + getValue().getValue() + '\n'; }
         });
         factory.addProduction(F, new Symbol[] { identifier }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public String generateCode() { return "push #" + getValue().getValue() + '\n'; }
+            @Override public String generateCode() { return "push #" + st.findSymbol(getValue().getValue()) + '\n'; }
         });
-        final int[] skip = { 0 };
         factory.addProduction(S, new Symbol[] { kwIf, open, E, close, S }, c ->
             new AST(c[0].getValue(), c[2], c[4]) {
                 @Override public String generateCode() {
                     return getChildren()[0].generateCode() +
-                            "pop #0l\nje 0 #0l skip" + skip[0] + '\n' + getChildren()[1].generateCode() + ":skip" + skip[0]++ + '\n';
+                            "pop #0\nje 0 #0 skip" + skip[0] + '\n' + getChildren()[1].generateCode() + ":skip" + skip[0]++ + '\n';
                 }
             }
         );

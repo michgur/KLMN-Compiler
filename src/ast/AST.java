@@ -28,7 +28,8 @@ public abstract class AST
         return s.toString().substring(0, s.lastIndexOf("\n", s.lastIndexOf("\n") - 1));
     }
     private void toString(StringBuilder s, String prefix, boolean last) {
-        s.append(prefix).append((last) ? "\\-[" : "|-[").append(value.getValue()).append("]\n");
+        if (value == null) s.append(prefix).append((last) ? "\\-[]\n" : "|-[]\n");
+        else s.append(prefix).append((last) ? "\\-[" : "|-[").append(value.getValue()).append("]\n");
         prefix += (last) ? "  " : "| ";
         if (children.length == 0) {
             if (last) s.append(prefix).append('\n');

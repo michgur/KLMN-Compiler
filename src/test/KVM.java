@@ -20,7 +20,7 @@ public class KVM
     // TODO: add jumps & conditions
     private static Map<String, Command> commands = new HashMap<>();
     private static Map<String, Integer> labels = new HashMap<>();
-    private static Map<String, Double> vars = new HashMap<>();
+    private static Map<Integer, Double> vars = new HashMap<>();
     private static Stack<Double> stack = new Stack<>();
     private static int instruction = -1; // instruction pointer (<("0")> JUST LIKE ASM!!! <("0")>)
 
@@ -29,18 +29,18 @@ public class KVM
             for (int i = 0; i < args.length - 1; i++) System.out.print(parseArg(args[i]) + ", ");
             System.out.println(parseArg(args[args.length - 1]));
         });
-        commands.put("put", (String... args) -> vars.put(args[0], parseArg(args[1])));
-        commands.put("add", (String... args) -> vars.put(args[0], vars.get(args[0]) + parseArg(args[1])));
-        commands.put("sub", (String... args) -> vars.put(args[0], vars.get(args[0]) - parseArg(args[1])));
-        commands.put("rsub", (String... args) -> vars.put(args[0], parseArg(args[1]) - vars.get(args[0])));
-        commands.put("mul", (String... args) -> vars.put(args[0], vars.get(args[0]) * parseArg(args[1])));
-        commands.put("div", (String... args) -> vars.put(args[0], vars.get(args[0]) / parseArg(args[1])));
-        commands.put("rdiv", (String... args) -> vars.put(args[0], parseArg(args[1]) / vars.get(args[0])));
-        commands.put("del", (String... args) -> vars.remove(args[0]));
+        commands.put("put", (String... args) -> setVar(args[0], parseArg(args[1])));
+        commands.put("add", (String... args) -> setVar(args[0], getVar(args[0]) + parseArg(args[1])));
+        commands.put("sub", (String... args) -> setVar(args[0], getVar(args[0]) - parseArg(args[1])));
+        commands.put("rsub", (String... args) -> setVar(args[0], parseArg(args[1]) - getVar(args[0])));
+        commands.put("mul", (String... args) -> setVar(args[0], getVar(args[0]) * parseArg(args[1])));
+        commands.put("div", (String... args) -> setVar(args[0], getVar(args[0]) / parseArg(args[1])));
+        commands.put("rdiv", (String... args) -> setVar(args[0], parseArg(args[1]) / getVar(args[0])));
+        commands.put("del", (String... args) -> vars.remove(Integer.parseInt(args[0].substring(1))));
         commands.put("push", (String... args) -> stack.push(parseArg(args[0])));
         commands.put("pop", (String... args) -> {
             double i = stack.pop();
-            if (args.length > 0) vars.put(args[0], i);
+            if (args.length > 0) setVar(args[0], i);
         });
         commands.put("jmp", (String... args) -> instruction = labels.get(args[0]));
         commands.put("je", (String... args) -> { if (parseArg(args[0]) == parseArg(args[1])) instruction = labels.get(args[2]); });
@@ -49,16 +49,18 @@ public class KVM
         commands.put("jle", (String... args) -> { if (parseArg(args[0]) >= parseArg(args[1])) instruction = labels.get(args[2]); });
         commands.put("js", (String... args) -> { if (parseArg(args[0]) < parseArg(args[1])) instruction = labels.get(args[2]); });
         commands.put("jse", (String... args) -> { if (parseArg(args[0]) < parseArg(args[1])) instruction = labels.get(args[2]); });
-        commands.put("eq", (String... args) -> vars.put(args[0], parseArg(args[0]) == parseArg(args[1]) ? 1.0 : 0.0));
-        commands.put("neq", (String... args) -> vars.put(args[0], parseArg(args[0]) != parseArg(args[1]) ? 1.0 : 0.0));
-        commands.put("lt", (String... args) -> vars.put(args[0], parseArg(args[0]) < parseArg(args[1]) ? 1.0 : 0.0));
-        commands.put("gt", (String... args) -> vars.put(args[0], parseArg(args[0]) > parseArg(args[1]) ? 1.0 : 0.0));
-        commands.put("leq", (String... args) -> vars.put(args[0], parseArg(args[0]) <= parseArg(args[1]) ? 1.0 : 0.0));
-        commands.put("geq", (String... args) -> vars.put(args[0], parseArg(args[0]) >= parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("eq", (String... args) -> setVar(args[0], parseArg(args[0]) == parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("neq", (String... args) -> setVar(args[0], parseArg(args[0]) != parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("lt", (String... args) -> setVar(args[0], parseArg(args[0]) < parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("gt", (String... args) -> setVar(args[0], parseArg(args[0]) > parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("leq", (String... args) -> setVar(args[0], parseArg(args[0]) <= parseArg(args[1]) ? 1.0 : 0.0));
+        commands.put("geq", (String... args) -> setVar(args[0], parseArg(args[0]) >= parseArg(args[1]) ? 1.0 : 0.0));
     }
 
+    private static double getVar(String arg) { return vars.get(Integer.parseInt(arg.substring(1))); }
+    private static void setVar(String arg, double value) { vars.put(Integer.parseInt(arg.substring(1)), value); }
     private static double parseArg(String arg) {
-        if (arg.startsWith("#")) return vars.get(arg);
+        if (arg.startsWith("#")) return getVar(arg);
         return Integer.parseInt(arg);
     }
 
