@@ -32,5 +32,6 @@ public class ASTFactory
         }
         @Override
         public int hashCode() { return 31 * getKey().hashCode() + Arrays.hashCode(getValue()); }
+        @Override public String toString() { return getKey() + " -> " + Arrays.toString(getValue()); }
     }
 }

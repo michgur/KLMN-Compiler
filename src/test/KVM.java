@@ -36,6 +36,8 @@ public class KVM
         commands.put("mul", (String... args) -> setVar(args[0], getVar(args[0]) * parseArg(args[1])));
         commands.put("div", (String... args) -> setVar(args[0], getVar(args[0]) / parseArg(args[1])));
         commands.put("rdiv", (String... args) -> setVar(args[0], parseArg(args[1]) / getVar(args[0])));
+        commands.put("land", (String... args) -> setVar(args[0], (getVar(args[0]) != 0) && (parseArg(args[1]) != 0) ? 1 : 0));
+        commands.put("lor", (String... args) -> setVar(args[0], (getVar(args[0]) != 0) || (parseArg(args[1]) != 0) ? 1 : 0));
         commands.put("del", (String... args) -> vars.remove(Integer.parseInt(args[0].substring(1))));
         commands.put("push", (String... args) -> stack.push(parseArg(args[0])));
         commands.put("pop", (String... args) -> {
@@ -67,7 +69,7 @@ public class KVM
     private KVM() {}
 
     public static void run(String code) {
-        System.out.println(">>> " + code.replace("\n", "\n>>> "));
+//        System.out.println(">>> " + code.replace("\n", "\n>>> "));
         instruction = -1;
         String[] instructions = code.toLowerCase().split("\n");
 
