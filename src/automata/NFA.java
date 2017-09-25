@@ -67,7 +67,7 @@ public class NFA<S, I>
         return !input.hasNext() && accept;
     }
 
-    public DFA<S, I> toDFA() { return new Converter<>(this).convert(); }
+    public DFA<S, I> toDFA() { return new NFA2DFA<>(this).convert(); }
 
     public Set<Integer> epsilonClosure(int state) {
         Set<Integer> e = new HashSet<>();

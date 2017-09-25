@@ -11,7 +11,7 @@ import java.util.*;
  *
  * Created by Michael on 8/8/2017.
  */
-class Converter<S, I>
+class NFA2DFA<S, I>
 {
     private NFA<S, I> src;
     private DFA<S, I> res = new DFA<>();
@@ -22,7 +22,7 @@ class Converter<S, I>
     // store epsilon closures of src
     private Map<Integer, Set<Integer>> epsClosure = new HashMap<>();
 
-    Converter(NFA<S, I> src) {
+    NFA2DFA(NFA<S, I> src) {
         this.src = src;
         end = src.accept;
     }
