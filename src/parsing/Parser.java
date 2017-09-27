@@ -5,6 +5,7 @@ import ast.ASTFactory;
 import automata.DFA;
 import automata.NFA;
 import javafx.util.Pair;
+import jdk.internal.org.objectweb.asm.MethodVisitor;
 import lang.*;
 
 import java.util.*;
@@ -42,7 +43,7 @@ public class Parser // SLR(1) Parser
             switch (a.type) {
                 case SHIFT:
                     stack.push(new Pair<>(new AST(input.peek()) {
-                        @Override public String generateCode() { return getValue().getValue(); }
+                        @Override public void apply(MethodVisitor mv) {}
                     }, a.state));
                     input.next();
                     break;

@@ -1,5 +1,6 @@
 package ast;
 
+import jdk.internal.org.objectweb.asm.MethodVisitor;
 import lang.Token;
 
 /**
@@ -16,7 +17,7 @@ public abstract class AST
         this.children = children;
     }
 
-    public abstract String generateCode();
+    public abstract void apply(MethodVisitor mv);
 
     public Token getValue() { return value; }
     public AST[] getChildren() { return children; }
