@@ -17,7 +17,7 @@ import java.util.List;
  */
 public class TEMP2 implements Opcodes
 {
-    public static void t(MethodVisitor mv, String code) throws Exception {
+    public static int t(MethodVisitor mv, String code) throws Exception {
         Language KLMN = new Language();
         TokenStream t = KLMN.tokenize(code);
 
@@ -528,13 +528,18 @@ public class TEMP2 implements Opcodes
 
         Grammar g = new Grammar(B);
         new Parser(g).parse(t, factory).apply(mv);
+        return maxLocals;
     }
 
+    private static int maxLocals = 1;
     private static int localSize = 1;
     private static List<Object> locals = new ArrayList<>();
     static { locals.add("[Ljava/lang/String;"); }
 
-    private static void addLocal(Object type) { locals.add(type); }
+    private static void addLocal(Object type) {
+        locals.add(type);
+        if (locals.size() > maxLocals) maxLocals = locals.size();
+    }
     private static void removeLocal() { locals.remove(locals.size() - 1); }
     private static void removeLocals(int size) { for (int i = 0; i < size; i++) removeLocal(); }
 

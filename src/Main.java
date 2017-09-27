@@ -48,7 +48,7 @@ public class Main implements Opcodes
 
     /* 💩💩💩 AMAZING 💩💩💩 */
     public static void main(String[] args) throws Exception {
-        // todo: NEXT ON THE AGENDA- reimplementing everything, controlling MAXS, and ORGANIZING FFS!
+        // todo: NEXT ON THE AGENDA- reimplementing everything(DONE), controlling MAXS(50% DONE), and ORGANIZING FFS!
         ClassWriter cw = new ClassWriter(0);
         MethodVisitor mv;
         cw.visit(0x34, ACC_PUBLIC, "Poop", null, descriptor(Object.class), null);
@@ -58,11 +58,11 @@ public class Main implements Opcodes
             mv.visitCode();
 
             String code = new String(Files.readAllBytes(Paths.get(args[0])));
-            TEMP2.t(mv, code);
+            int ML = TEMP2.t(mv, code);
 
             mv.visitInsn(RETURN);
 
-            mv.visitMaxs(100, 100); //todo
+            mv.visitMaxs(100, ML); //todo
             mv.visitEnd();
         }
         cw.visitEnd();
