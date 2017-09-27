@@ -12,7 +12,7 @@ import java.util.Map;
 public class SymbolTable
 {
     private Deque<Map<String, Integer>> table = new ArrayDeque<>();
-    private int index = 0;
+    private int index = 1; // args[] is at index 0
 
     public void addSymbol(String symbol) { table.peek().put(symbol, index++); }
     public Integer findSymbol(String symbol) {

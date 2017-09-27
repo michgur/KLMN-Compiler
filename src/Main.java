@@ -1,9 +1,8 @@
 import jdk.internal.org.objectweb.asm.*;
+import jdk.internal.org.objectweb.asm.util.ASMifier;
 import test.TEMP2;
-// TODO: when I finish playing with ASM, change to the other import, it seems newer, but does'nt have parameter names
 
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
@@ -49,7 +48,8 @@ public class Main implements Opcodes
 
     /* 💩💩💩 AMAZING 💩💩💩 */
     public static void main(String[] args) throws Exception {
-        // this shit is still messy AF, but it's not my problem
+        int i = -1 & 1;
+        // todo: NEXT ON THE AGENDA- reimplementing everything, controlling MAXS, and ORGANIZING FFS!
         ClassWriter cw = new ClassWriter(0);
         MethodVisitor mv;
         cw.visit(0x34, ACC_PUBLIC, "Poop", null, descriptor(Object.class), null);
@@ -70,5 +70,13 @@ public class Main implements Opcodes
 
         try { Files.write(Paths.get("Poop.class"), cw.toByteArray()); }
         catch (IOException e) { throw new RuntimeException(e); }
+
+        ProcessBuilder builder = new ProcessBuilder(
+                "cmd.exe", "/c", "java -cp \"C:\\Users\\Michael\\IdeaProjects\\KLMN© Compiler\" Poop");
+        builder.redirectErrorStream(true);
+        Process p = builder.start();
+        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line;
+        while ((line = r.readLine()) != null) System.out.println(line);
     }
 }

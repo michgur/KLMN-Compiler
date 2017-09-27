@@ -1,6 +1,2 @@
-# FIRST PSEUDO-USEFUL KLMN ALGORITHM EVER- Factorial Calculation;
 
-var n = 7 * 3 + 5 - 5; #input N here
-n = 5;
-var ans = 1;
-print ans + n;
+for (var i = 5; i >= 3; i--) print i;
