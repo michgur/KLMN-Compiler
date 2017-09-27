@@ -1,2 +1,12 @@
 
-for (var i = 5; i >= 3; i--) print i;
+for (var i = 5; i >= 0; i--) {
+    var j = i * 4;
+    var k = j / 2;
+    print k - i;
+    if (k - i == 2) print 100;
+}
+
+var i = 5;
+print i;
+var j = i * 200.5;
+print j - 0.5 + i;

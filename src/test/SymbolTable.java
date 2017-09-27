@@ -23,5 +23,9 @@ public class SymbolTable
     public boolean checkScope(String symbol) { return table.peek().containsKey(symbol); }
 
     public void enterScope() { table.push(new HashMap<>()); }
-    public void exitScope() { table.pop(); }
+    public int exitScope() {
+        int size = table.pop().size();
+        index -= size;
+        return size;
+    }
 }

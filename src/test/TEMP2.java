@@ -140,7 +140,7 @@ public class TEMP2 implements Opcodes
             @Override public void apply(MethodVisitor mv) {
                 st.enterScope();
                 getChildren()[0].apply(mv);
-                st.exitScope();
+                removeLocals(st.exitScope());
             }
         });
         factory.addProduction(S1, new Symbol[] { S, semicolon }, c -> c[0]);
@@ -152,7 +152,7 @@ public class TEMP2 implements Opcodes
                 @Override public void apply(MethodVisitor mv) {
                     st.enterScope();
                     for (AST ast : getChildren()) ast.apply(mv);
-                    st.exitScope();
+                    removeLocals(st.exitScope());
                 }
             };
         });
@@ -466,7 +466,7 @@ public class TEMP2 implements Opcodes
                 mv.visitJumpInsn(IFEQ, end);
                 st.enterScope();
                 getChildren()[1].apply(mv);
-                st.exitScope();
+                removeLocals(st.exitScope());
                 mv.visitLabel(end);
                 applyFrame(mv, 0, null);
             }
@@ -479,7 +479,7 @@ public class TEMP2 implements Opcodes
                         mv.visitJumpInsn(IFEQ, end);
                         st.enterScope();
                         getChildren()[1].apply(mv);
-                        st.exitScope();
+                        removeLocals(st.exitScope());
                         mv.visitLabel(end);
                         applyFrame(mv, 0, null);
                     }
@@ -497,10 +497,10 @@ public class TEMP2 implements Opcodes
                         mv.visitJumpInsn(IFEQ, end);
                         st.enterScope();
                         getChildren()[3].apply(mv);
-                        st.exitScope();
+                        removeLocals(st.exitScope());
                         getChildren()[2].apply(mv);
                         mv.visitJumpInsn(GOTO, loop);
-                        st.exitScope();
+                        removeLocals(st.exitScope());
                         mv.visitLabel(end);
                         applyFrame(mv, 0, null);
                     }
@@ -517,10 +517,10 @@ public class TEMP2 implements Opcodes
                         mv.visitJumpInsn(IFEQ, end);
                         st.enterScope();
                         getChildren()[3].apply(mv);
-                        st.exitScope();
+                        removeLocals(st.exitScope());
                         getChildren()[2].apply(mv);
                         mv.visitJumpInsn(GOTO, loop);
-                        st.exitScope();
+                        removeLocals(st.exitScope());
                         mv.visitLabel(end);
                         applyFrame(mv, 0, null);
                     }
@@ -536,6 +536,7 @@ public class TEMP2 implements Opcodes
 
     private static void addLocal(Object type) { locals.add(type); }
     private static void removeLocal() { locals.remove(locals.size() - 1); }
+    private static void removeLocals(int size) { for (int i = 0; i < size; i++) removeLocal(); }
 
     private static void applyFrame(MethodVisitor mv, int stackSize, Object[] stack) {  // currently only manages locals
         int newSize = locals.size(); // currently doesn't take care of longs/doubles
@@ -546,7 +547,7 @@ public class TEMP2 implements Opcodes
         else if (stackSize != 0) mv.visitFrame(F_FULL, newSize, locals.toArray(), stackSize, stack);
         else if (newSize > localSize) mv.visitFrame(F_APPEND, newSize - localSize,
                 locals.subList(localSize, newSize).toArray(), 0, null);
-        else mv.visitFrame(F_CHOP, newSize, null, 0, null);
+        else mv.visitFrame(F_CHOP, localSize - newSize, null, 0, null);
         localSize = newSize;
     }
 }

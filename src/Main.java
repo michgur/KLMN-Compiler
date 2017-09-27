@@ -48,7 +48,6 @@ public class Main implements Opcodes
 
     /* 💩💩💩 AMAZING 💩💩💩 */
     public static void main(String[] args) throws Exception {
-        int i = -1 & 1;
         // todo: NEXT ON THE AGENDA- reimplementing everything, controlling MAXS, and ORGANIZING FFS!
         ClassWriter cw = new ClassWriter(0);
         MethodVisitor mv;
