@@ -1,15 +1,3 @@
-
-for (var i = 5; i >= 0; i--) {
-    var j = i * 4;
-    var k = j / 2;
-    print k - i;
-    if (k - i == 2) {
-        var z = 9;
-        print z * i;
-    }
-}
-
-var i = 5;
-print i;
-var j = i * 200.5;
-print j - 0.5 + i;
+for (var i = 5; i < 10; i++)
+    for (var j = 0; j < 5; j++)
+        print i;

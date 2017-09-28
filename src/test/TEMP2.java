@@ -17,6 +17,7 @@ import java.util.List;
  */
 public class TEMP2 implements Opcodes
 {
+    // UNTIL I HAVE TYPES, BOOLEANS CAN ONLY BE INSIDE IFs, SINCE THEY'RE INTEGERS AND EVERYTHING ELSE IS FLOAT
     public static int t(MethodVisitor mv, String code) throws Exception {
         Language KLMN = new Language();
         TokenStream t = KLMN.tokenize(code);
@@ -136,6 +137,12 @@ public class TEMP2 implements Opcodes
         SymbolTable st = new SymbolTable();
         st.enterScope();
         ASTFactory factory = new ASTFactory();
+        ///////conditions
+        final Label[] condEnd = { new Label() }; // the end of current condition
+        final boolean[] insideCond = { false }, // whether current AST node is inside a condition
+                skipFor = { false }; // for conditions, the boolean they should skip to condEnd for
+        /////////////////
+        //<editor-fold desc="Factory">
         factory.addProduction(B, new Symbol[] { S1 }, c -> new AST(new Token(null, "Block"), c[0]) {
             @Override public void apply(MethodVisitor mv) {
                 st.enterScope();
@@ -186,6 +193,19 @@ public class TEMP2 implements Opcodes
         factory.addProduction(E, new Symbol[] { E, lOr, T4 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public void apply(MethodVisitor mv) {
+                        if (insideCond[0]) {
+                            Label end = condEnd[0], body = new Label();
+                            condEnd[0] = body;
+                            skipFor[0] = !skipFor[0];
+                            getChildren()[0].apply(mv); // true -> skip to 'body', false -> resume
+                            skipFor[0] = !skipFor[0];
+                            condEnd[0] = end;
+                            applyFrame(mv, 0, null);
+                            getChildren()[1].apply(mv); // true -> resume, false -> skip to 'end'
+                            mv.visitLabel(body);
+                            applyFrame(mv, 0, null);
+                            return;
+                        }
                         Label cond2 = new Label(), end = new Label();
                         getChildren()[0].apply(mv);
                         mv.visitJumpInsn(IFEQ, cond2); // if false(=0), check other cond
@@ -202,6 +222,20 @@ public class TEMP2 implements Opcodes
         factory.addProduction(T4, new Symbol[] { T4, lAnd, T3 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                 @Override public void apply(MethodVisitor mv) {
+                        if (insideCond[0]) {
+                            if (skipFor[0]) {
+                                skipFor[0] = false;
+                                getChildren()[0].apply(mv); // true -> skip to END, false -> resume
+                                skipFor[0] = true;
+                                applyFrame(mv, 0, null);
+                                getChildren()[1].apply(mv); // true -> skip to END, false -> resume
+                                return;
+                            }
+                            getChildren()[0].apply(mv);
+                            applyFrame(mv, 0, null);
+                            getChildren()[1].apply(mv);
+                            return;
+                        }
                         Label cond2 = new Label(), end = new Label();
                         getChildren()[0].apply(mv);
                         mv.visitJumpInsn(IFNE, cond2); // if true(=1), check other cond
@@ -214,12 +248,18 @@ public class TEMP2 implements Opcodes
                         applyFrame(mv, 1, new Object[] { INTEGER });
                     }
                 });
-
-        Label skipIf;
         factory.addProduction(T3, new Symbol[] { T2 }, c -> c[0]);
         factory.addProduction(T3, new Symbol[] { T3, equals, T2 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public void apply(MethodVisitor mv) {
+                        if (insideCond[0]) {
+                            getChildren()[0].apply(mv);
+                            getChildren()[1].apply(mv);
+                            mv.visitInsn(FCMPG);
+                            if (skipFor[0]) mv.visitJumpInsn(IFEQ, condEnd[0]);
+                            else mv.visitJumpInsn(IFNE, condEnd[0]);
+                            return;
+                        }
                         getChildren()[0].apply(mv);
                         getChildren()[1].apply(mv);
                         mv.visitInsn(FCMPG);
@@ -237,42 +277,30 @@ public class TEMP2 implements Opcodes
         factory.addProduction(T3, new Symbol[] { T3, nEquals, T2 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public void apply(MethodVisitor mv) {
+                        if (insideCond[0]) {
+                            getChildren()[0].apply(mv);
+                            getChildren()[1].apply(mv);
+                            mv.visitInsn(FCMPG);
+                            if (!skipFor[0]) mv.visitJumpInsn(IFEQ, condEnd[0]);
+                            else mv.visitJumpInsn(IFNE, condEnd[0]);
+                            return;
+                        }
                         getChildren()[0].apply(mv);
                         getChildren()[1].apply(mv);
                         mv.visitInsn(FCMPG);
                     }
                 });
-        // todo: you can be smarter about these expressions if you know for sure that they are inside IF
-        // (by utilizing the if_icmp<> instructions directly
-        // i'll have to separate if statements from boolean expressions in the future
-        // hierarchy: AND + OR come before EQ, NE, LT, LE, GT & GE
-        // the IF requires one label by default. every OR adds another label, but ANDs don't
-        //      the other operators operate on numbers, so they can be treated just-
-        //      like arithmetic operators - who don't need JMPs and shit.
-        //      but NVM dat, since the operator determines the type of JMP. I don't-
-        //      wanna change the entire tree structure just for that shite.
-        //
-        // SO:
-        // IF:
-        //      COND
-        //      FALSE- SKIP
-        //      BODY
-        //      SKIP
-        //
-        // AND:
-        //      COND1
-        //      FALSE- SKIP
-        //      COND2
-        //      FALSE- SKIP
-        //
-        // OR:
-        //      COND1
-        //      TRUE- SKIP2
-        //      COND2
-        //      SKIP2
         factory.addProduction(T2, new Symbol[] { T2, less, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public void apply(MethodVisitor mv) {
+                        if (insideCond[0]) {
+                            getChildren()[0].apply(mv);
+                            getChildren()[1].apply(mv);
+                            mv.visitInsn(FCMPG);
+                            if (skipFor[0]) mv.visitJumpInsn(IFLT, condEnd[0]);
+                            else mv.visitJumpInsn(IFGE, condEnd[0]);
+                            return;
+                        }
                         getChildren()[1].apply(mv);
                         getChildren()[0].apply(mv);
                         mv.visitInsn(FCMPG);
@@ -291,6 +319,14 @@ public class TEMP2 implements Opcodes
         factory.addProduction(T2, new Symbol[] { T2, greater, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public void apply(MethodVisitor mv) {
+                        if (insideCond[0]) {
+                            getChildren()[0].apply(mv);
+                            getChildren()[1].apply(mv);
+                            mv.visitInsn(FCMPG);
+                            if (skipFor[0]) mv.visitJumpInsn(IFGT, condEnd[0]);
+                            else mv.visitJumpInsn(IFLE, condEnd[0]);
+                            return;
+                        }
                         getChildren()[0].apply(mv);
                         getChildren()[1].apply(mv);
                         mv.visitInsn(FCMPG);
@@ -309,6 +345,14 @@ public class TEMP2 implements Opcodes
         factory.addProduction(T2, new Symbol[] { T2, lessEquals, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public void apply(MethodVisitor mv) {
+                        if (insideCond[0]) {
+                            getChildren()[0].apply(mv);
+                            getChildren()[1].apply(mv);
+                            mv.visitInsn(FCMPG);
+                            if (skipFor[0]) mv.visitJumpInsn(IFLE, condEnd[0]);
+                            else mv.visitJumpInsn(IFGT, condEnd[0]);
+                            return;
+                        }
                         getChildren()[0].apply(mv);
                         getChildren()[1].apply(mv);
                         mv.visitInsn(FCMPG);
@@ -327,6 +371,14 @@ public class TEMP2 implements Opcodes
         factory.addProduction(T2, new Symbol[] { T2, greaterEquals, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
                     @Override public void apply(MethodVisitor mv) {
+                        if (insideCond[0]) {
+                            getChildren()[0].apply(mv);
+                            getChildren()[1].apply(mv);
+                            mv.visitInsn(FCMPG);
+                            if (skipFor[0]) mv.visitJumpInsn(IFGE, condEnd[0]);
+                            else mv.visitJumpInsn(IFLT, condEnd[0]);
+                            return;
+                        }
                         getChildren()[1].apply(mv);
                         getChildren()[0].apply(mv);
                         mv.visitInsn(FCMPG);
@@ -453,18 +505,33 @@ public class TEMP2 implements Opcodes
             }
         });
         factory.addProduction(F, new Symbol[] { kwFalse }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void apply(MethodVisitor mv) { mv.visitInsn(ICONST_0); }
+            @Override public void apply(MethodVisitor mv) {
+                if (insideCond[0]) {
+                    if (!skipFor[0]) mv.visitJumpInsn(GOTO, condEnd[0]);
+                    return;
+                }
+                mv.visitInsn(ICONST_0);
+            }
         });
         factory.addProduction(F, new Symbol[] { kwTrue }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void apply(MethodVisitor mv) { mv.visitInsn(ICONST_1); }
+            @Override public void apply(MethodVisitor mv) {
+                if (insideCond[0]) {
+                    if (skipFor[0]) mv.visitJumpInsn(GOTO, condEnd[0]);
+                    return;
+                }
+                mv.visitInsn(ICONST_1);
+            }
         });
         factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, S1 }, c ->
         new AST(c[0].getValue(), c[2], c[4]) {
             @Override public void apply(MethodVisitor mv) {
-                getChildren()[0].apply(mv);
                 Label end = new Label();
-                mv.visitJumpInsn(IFEQ, end);
+                condEnd[0] = end;
+                insideCond[0] = true;
+                getChildren()[0].apply(mv);
+                insideCond[0] = false;
                 st.enterScope();
+                applyFrame(mv, 0, null);
                 getChildren()[1].apply(mv);
                 removeLocals(st.exitScope());
                 mv.visitLabel(end);
@@ -474,10 +541,13 @@ public class TEMP2 implements Opcodes
         factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, openCurly, B, closeCurly }, c ->
                 new AST(c[0].getValue(), c[2], c[5]) {
                     @Override public void apply(MethodVisitor mv) {
-                        getChildren()[0].apply(mv);
                         Label end = new Label();
-                        mv.visitJumpInsn(IFEQ, end);
+                        condEnd[0] = end;
+                        insideCond[0] = true;
+                        getChildren()[0].apply(mv);
+                        insideCond[0] = false;
                         st.enterScope();
+                        applyFrame(mv, 0, null);
                         getChildren()[1].apply(mv);
                         removeLocals(st.exitScope());
                         mv.visitLabel(end);
@@ -493,8 +563,10 @@ public class TEMP2 implements Opcodes
                         getChildren()[0].apply(mv);
                         mv.visitLabel(loop);
                         applyFrame(mv, 0, null);
+                        condEnd[0] = end;
+                        insideCond[0] = true;
                         getChildren()[1].apply(mv);
-                        mv.visitJumpInsn(IFEQ, end);
+                        insideCond[0] = false;
                         st.enterScope();
                         getChildren()[3].apply(mv);
                         removeLocals(st.exitScope());
@@ -513,8 +585,11 @@ public class TEMP2 implements Opcodes
                         getChildren()[0].apply(mv);
                         mv.visitLabel(loop);
                         applyFrame(mv, 0, null);
+                        condEnd[0] = end;
+                        insideCond[0] = true;
                         getChildren()[1].apply(mv);
-                        mv.visitJumpInsn(IFEQ, end);
+                        insideCond[0] = false;
+                        applyFrame(mv, 0, null);
                         st.enterScope();
                         getChildren()[3].apply(mv);
                         removeLocals(st.exitScope());
@@ -525,6 +600,7 @@ public class TEMP2 implements Opcodes
                         applyFrame(mv, 0, null);
                     }
                 });
+        //</editor-fold>
 
         Grammar g = new Grammar(B);
         new Parser(g).parse(t, factory).apply(mv);
