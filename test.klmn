@@ -1,3 +1,4 @@
-for (var i = 5; i < 10; i++)
-    for (var j = 0; j < 5; j++)
-        print i;
+var n = 6;
+for (var i = 0; i <= n; i++)
+    for (var j = 0; j < n + 1; j++)
+        if (i > j) print i;

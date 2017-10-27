@@ -1,7 +1,7 @@
 package ast;
 
-import javafx.util.Pair;
 import lang.Symbol;
+import util.Pair;
 
 import java.util.Arrays;
 import java.util.HashMap;

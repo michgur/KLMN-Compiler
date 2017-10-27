@@ -2,9 +2,10 @@ package test;
 
 import ast.AST;
 import ast.ASTFactory;
-import jdk.internal.org.objectweb.asm.Label;
-import jdk.internal.org.objectweb.asm.MethodVisitor;
-import jdk.internal.org.objectweb.asm.Opcodes;
+import jvm.Opcodes;
+import jvm.classes.ConstPool;
+import jvm.methods.Code;
+import jvm.methods.Frame;
 import lang.*;
 import parsing.Parser;
 
@@ -17,10 +18,9 @@ import java.util.List;
  */
 public class TEMP2 implements Opcodes
 {
-    // UNTIL I HAVE TYPES, BOOLEANS CAN ONLY BE INSIDE IFs, SINCE THEY'RE INTEGERS AND EVERYTHING ELSE IS FLOAT
-    public static int t(MethodVisitor mv, String code) throws Exception {
+    public static void t(ConstPool constPool, Code code, String source) throws Exception {
         Language KLMN = new Language();
-        TokenStream t = KLMN.tokenize(code);
+        TokenStream t = KLMN.tokenize(source);
 
         Symbol B = new Symbol("BLCK"), S = new Symbol("STMT"), A = new Symbol(":="), S1 = new Symbol("STMT1");
         Symbol E = new Symbol("EXPR"), F = new Symbol("F"), F1 = new Symbol("F1"), F2 = new Symbol("F2"),
@@ -134,20 +134,26 @@ public class TEMP2 implements Opcodes
         F.addProduction(kwFalse);
         F.addProduction(identifier);
 
+        // TODO: specialized AST node classes (Expressions, Conditions, Loops,
+        // TODO:    and Eventually Methods (with MethodInfos & Codes) & Classes (with ClassFiles))
+
+        // TODO: merge Code and these vars to some writer class
+        // TODO:    (perhaps keep the lower-level shit at Code class, and add writing funcs to the writer)
+        // TODO:    it should manage scopes and vars automatically, & help to avoid lots of repetition
         SymbolTable st = new SymbolTable();
         st.enterScope();
         ASTFactory factory = new ASTFactory();
         ///////conditions
-        final Label[] condEnd = { new Label() }; // the end of current condition
+        final Frame[] condEnd = { new Frame() }; // the end of current condition
         final boolean[] insideCond = { false }, // whether current AST node is inside a condition
                 skipFor = { false }; // for conditions, the boolean they should skip to condEnd for
         /////////////////
         //<editor-fold desc="Factory">
         factory.addProduction(B, new Symbol[] { S1 }, c -> new AST(new Token(null, "Block"), c[0]) {
-            @Override public void apply(MethodVisitor mv) {
+            @Override public void write(Code code) {
                 st.enterScope();
-                getChildren()[0].apply(mv);
-                removeLocals(st.exitScope());
+                getChildren()[0].write(code);
+                code.chop(st.exitScope());
             }
         });
         factory.addProduction(S1, new Symbol[] { S, semicolon }, c -> c[0]);
@@ -156,479 +162,427 @@ public class TEMP2 implements Opcodes
             System.arraycopy(c[0].getChildren(), 0, children, 0, c[0].getChildren().length);
             children[children.length - 1] = c[1];
             return new AST(new Token(null, "Block"), children) {
-                @Override public void apply(MethodVisitor mv) {
+                @Override public void write(Code code) {
                     st.enterScope();
-                    for (AST ast : getChildren()) ast.apply(mv);
-                    removeLocals(st.exitScope());
+                    for (AST ast : getChildren()) ast.write(code);
+                    code.chop(st.exitScope());
                 }
             };
         });
         factory.addProduction(S, new Symbol[] { A }, c -> c[0]);
         factory.addProduction(A, new Symbol[] { var, identifier, assign, E }, c ->
                 new AST(c[2].getValue(), c[1], c[3]) {
-                    @Override public void apply(MethodVisitor mv) {
+                    @Override public void write(Code code) {
                         String name = getChildren()[0].getValue().getValue();
                         if (st.checkScope(name)) throw new RuntimeException("variable " + name + " already defined!");
                         st.addSymbol(name);
-                        getChildren()[1].apply(mv);
-                        mv.visitVarInsn(FSTORE, st.findSymbol(name));
-                        addLocal(FLOAT);
+                        getChildren()[1].write(code);
+                        code.popToLocal(st.findSymbol(name));
                     }
                 });
         factory.addProduction(A, new Symbol[] { identifier, assign, E }, c ->
                 new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
-                        getChildren()[1].apply(mv);// + "pop #" + st.findSymbol(getChildren()[0].getValue().getValue()) + '\n';
-                        mv.visitVarInsn(FSTORE, st.findSymbol(getChildren()[0].getValue().getValue()));
+                    @Override public void write(Code code) {
+                        getChildren()[1].write(code);// + "pop #" + st.findSymbol(getChildren()[0].getValue().getValue()) + '\n';
+                        code.popToLocal(st.findSymbol(getChildren()[0].getValue().getValue()));
                     }
                 });
         factory.addProduction(S, new Symbol[] { print, E }, c -> new AST(c[0].getValue(), c[1]) {
-            @Override public void apply(MethodVisitor mv) {
-                mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-                getChildren()[0].apply(mv);
-                mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(F)V", false);
+            @Override public void write(Code code) {
+                code.pushField(GETSTATIC, constPool.addFieldref("java/lang/System", "out", 
+                        "Ljava/io/PrintStream;"), "Ljava/io/PrintStream;");
+                getChildren()[0].write(code);
+                code.invoke(INVOKEVIRTUAL, constPool.addMethodref("java/io/PrintStream", 
+                        "println", "(F)V"), "V", 1);
             }
         });
         factory.addProduction(E, new Symbol[] { T4 }, c -> c[0]);
         factory.addProduction(E, new Symbol[] { E, lOr, T4 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
+                    @Override public void write(Code code) {
                         if (insideCond[0]) {
-                            Label end = condEnd[0], body = new Label();
+                            Frame end = condEnd[0], body = new Frame();
                             condEnd[0] = body;
                             skipFor[0] = !skipFor[0];
-                            getChildren()[0].apply(mv); // true -> skip to 'body', false -> resume
+                            getChildren()[0].write(code); // true -> skip to 'body', false -> resume
                             skipFor[0] = !skipFor[0];
                             condEnd[0] = end;
-                            applyFrame(mv, 0, null);
-                            getChildren()[1].apply(mv); // true -> resume, false -> skip to 'end'
-                            mv.visitLabel(body);
-                            applyFrame(mv, 0, null);
+                            getChildren()[1].write(code); // true -> resume, false -> skip to 'end'
+                            code.assignFrame(body);
                             return;
                         }
-                        Label cond2 = new Label(), end = new Label();
-                        getChildren()[0].apply(mv);
-                        mv.visitJumpInsn(IFEQ, cond2); // if false(=0), check other cond
-                        mv.visitInsn(ICONST_1); // if true(=0), push true and end
-                        mv.visitJumpInsn(GOTO, end);
-                        mv.visitLabel(cond2); // here we get the final result
-                        applyFrame(mv, 0, null);
-                        getChildren()[1].apply(mv);
-                        mv.visitLabel(end);
-                        applyFrame(mv, 1, new Object[] { INTEGER });
+                        Frame cond2 = new Frame(), end = new Frame();
+                        getChildren()[0].write(code);
+                        code.unaryJmpOperator(IFEQ, cond2); // if false(=0), check other cond
+                        code.pushInt(1); // if true(=0), push true and end
+                        code.jmpOperator(GOTO, end);
+                        code.assignFrame(cond2); // here we get the final result
+                        getChildren()[1].write(code);
+                        code.assignFrame(end);
                     }
                 });
         factory.addProduction(T4, new Symbol[] { T3 }, c -> c[0]);
         factory.addProduction(T4, new Symbol[] { T4, lAnd, T3 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                @Override public void apply(MethodVisitor mv) {
+                @Override public void write(Code code) {
                         if (insideCond[0]) {
                             if (skipFor[0]) {
                                 skipFor[0] = false;
-                                getChildren()[0].apply(mv); // true -> skip to END, false -> resume
+                                getChildren()[0].write(code); // true -> skip to END, false -> resume
                                 skipFor[0] = true;
-                                applyFrame(mv, 0, null);
-                                getChildren()[1].apply(mv); // true -> skip to END, false -> resume
+                                getChildren()[1].write(code); // true -> skip to END, false -> resume
                                 return;
                             }
-                            getChildren()[0].apply(mv);
-                            applyFrame(mv, 0, null);
-                            getChildren()[1].apply(mv);
+                            getChildren()[0].write(code);
+                            getChildren()[1].write(code);
                             return;
                         }
-                        Label cond2 = new Label(), end = new Label();
-                        getChildren()[0].apply(mv);
-                        mv.visitJumpInsn(IFNE, cond2); // if true(=1), check other cond
-                        mv.visitInsn(ICONST_0); // if false(=0), push false and end
-                        mv.visitJumpInsn(GOTO, end);
-                        mv.visitLabel(cond2); // here we get the final result
-                        applyFrame(mv, 0, null);
-                        getChildren()[1].apply(mv);
-                        mv.visitLabel(end);
-                        applyFrame(mv, 1, new Object[] { INTEGER });
+                        Frame cond2 = new Frame(), end = new Frame();
+                        getChildren()[0].write(code);
+                        code.unaryJmpOperator(IFNE, cond2); // if true(=1), check other cond
+                        code.pushInt(0); // if false(=0), push false and end
+                        code.jmpOperator(GOTO, end);
+                        code.assignFrame(cond2); // here we get the final result
+                        getChildren()[1].write(code);
+                        code.assignFrame(end);
                     }
                 });
         factory.addProduction(T3, new Symbol[] { T2 }, c -> c[0]);
         factory.addProduction(T3, new Symbol[] { T3, equals, T2 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
+                    @Override public void write(Code code) {
                         if (insideCond[0]) {
-                            getChildren()[0].apply(mv);
-                            getChildren()[1].apply(mv);
-                            mv.visitInsn(FCMPG);
-                            if (skipFor[0]) mv.visitJumpInsn(IFEQ, condEnd[0]);
-                            else mv.visitJumpInsn(IFNE, condEnd[0]);
+                            getChildren()[0].write(code);
+                            getChildren()[1].write(code);
+                            code.binaryOperator(FCMPG);
+                            if (skipFor[0]) code.unaryJmpOperator(IFEQ, condEnd[0]);
+                            else code.unaryJmpOperator(IFNE, condEnd[0]);
                             return;
                         }
-                        getChildren()[0].apply(mv);
-                        getChildren()[1].apply(mv);
-                        mv.visitInsn(FCMPG);
-                        Label t = new Label(), f = new Label();
-                        mv.visitJumpInsn(IFNE, f);
-                        mv.visitInsn(ICONST_1);
-                        mv.visitJumpInsn(GOTO, t);
-                        mv.visitLabel(f);
-                        applyFrame(mv, 0, null);
-                        mv.visitInsn(ICONST_0);
-                        mv.visitLabel(t);
-                        applyFrame(mv, 1, new Object[] { INTEGER });
+                        getChildren()[0].write(code);
+                        getChildren()[1].write(code);
+                        code.binaryOperator(FCMPG);
+                        Frame t = new Frame(), f = new Frame();
+                        code.unaryJmpOperator(IFNE, f);
+                        code.pushInt(1);
+                        code.jmpOperator(GOTO, t);
+                        code.assignFrame(f);
+                        code.pushInt(0);
+                        code.assignFrame(t);
                     }
                 });
         factory.addProduction(T3, new Symbol[] { T3, nEquals, T2 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
+                    @Override public void write(Code code) {
                         if (insideCond[0]) {
-                            getChildren()[0].apply(mv);
-                            getChildren()[1].apply(mv);
-                            mv.visitInsn(FCMPG);
-                            if (!skipFor[0]) mv.visitJumpInsn(IFEQ, condEnd[0]);
-                            else mv.visitJumpInsn(IFNE, condEnd[0]);
+                            getChildren()[0].write(code);
+                            getChildren()[1].write(code);
+                            code.binaryOperator(FCMPG);
+                            if (!skipFor[0]) code.unaryJmpOperator(IFEQ, condEnd[0]);
+                            else code.unaryJmpOperator(IFNE, condEnd[0]);
                             return;
                         }
-                        getChildren()[0].apply(mv);
-                        getChildren()[1].apply(mv);
-                        mv.visitInsn(FCMPG);
+                        getChildren()[0].write(code);
+                        getChildren()[1].write(code);
+                        code.binaryOperator(FCMPG);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, less, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
+                    @Override public void write(Code code) {
                         if (insideCond[0]) {
-                            getChildren()[0].apply(mv);
-                            getChildren()[1].apply(mv);
-                            mv.visitInsn(FCMPG);
-                            if (skipFor[0]) mv.visitJumpInsn(IFLT, condEnd[0]);
-                            else mv.visitJumpInsn(IFGE, condEnd[0]);
+                            getChildren()[0].write(code);
+                            getChildren()[1].write(code);
+                            code.binaryOperator(FCMPG);
+                            if (skipFor[0]) code.unaryJmpOperator(IFLT, condEnd[0]);
+                            else code.unaryJmpOperator(IFGE, condEnd[0]);
                             return;
                         }
-                        getChildren()[1].apply(mv);
-                        getChildren()[0].apply(mv);
-                        mv.visitInsn(FCMPG);
-                        mv.visitInsn(ICONST_1);
-                        Label t = new Label(), f = new Label();
-                        mv.visitJumpInsn(IF_ICMPNE, f);
-                        mv.visitInsn(ICONST_1);
-                        mv.visitJumpInsn(GOTO, t);
-                        mv.visitLabel(f);
-                        applyFrame(mv, 0, null);
-                        mv.visitInsn(ICONST_0);
-                        mv.visitLabel(t);
-                        applyFrame(mv, 1, new Object[] { INTEGER });
+                        getChildren()[1].write(code);
+                        getChildren()[0].write(code);
+                        code.binaryOperator(FCMPG);
+                        code.pushInt(1);
+                        Frame t = new Frame(), f = new Frame();
+                        code.binaryJmpOperator(IF_ICMPNE, f);
+                        code.pushInt(1);
+                        code.jmpOperator(GOTO, t);
+                        code.assignFrame(f);
+                        code.pushInt(0);
+                        code.assignFrame(t);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, greater, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
+                    @Override public void write(Code code) {
                         if (insideCond[0]) {
-                            getChildren()[0].apply(mv);
-                            getChildren()[1].apply(mv);
-                            mv.visitInsn(FCMPG);
-                            if (skipFor[0]) mv.visitJumpInsn(IFGT, condEnd[0]);
-                            else mv.visitJumpInsn(IFLE, condEnd[0]);
+                            getChildren()[0].write(code);
+                            getChildren()[1].write(code);
+                            code.binaryOperator(FCMPG);
+                            if (skipFor[0]) code.unaryJmpOperator(IFGT, condEnd[0]);
+                            else code.unaryJmpOperator(IFLE, condEnd[0]);
                             return;
                         }
-                        getChildren()[0].apply(mv);
-                        getChildren()[1].apply(mv);
-                        mv.visitInsn(FCMPG);
-                        mv.visitInsn(ICONST_1);
-                        Label t = new Label(), f = new Label();
-                        mv.visitJumpInsn(IF_ICMPNE, f);
-                        mv.visitInsn(ICONST_1);
-                        mv.visitJumpInsn(GOTO, t);
-                        mv.visitLabel(f);
-                        applyFrame(mv, 0, null);
-                        mv.visitInsn(ICONST_0);
-                        mv.visitLabel(t);
-                        applyFrame(mv, 1, new Object[] { INTEGER });
+                        getChildren()[0].write(code);
+                        getChildren()[1].write(code);
+                        code.binaryOperator(FCMPG);
+                        code.pushInt(1);
+                        Frame t = new Frame(), f = new Frame();
+                        code.binaryJmpOperator(IF_ICMPNE, f);
+                        code.pushInt(1);
+                        code.jmpOperator(GOTO, t);
+                        code.assignFrame(f);
+                        code.pushInt(0);
+                        code.assignFrame(t);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, lessEquals, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
+                    @Override public void write(Code code) {
                         if (insideCond[0]) {
-                            getChildren()[0].apply(mv);
-                            getChildren()[1].apply(mv);
-                            mv.visitInsn(FCMPG);
-                            if (skipFor[0]) mv.visitJumpInsn(IFLE, condEnd[0]);
-                            else mv.visitJumpInsn(IFGT, condEnd[0]);
+                            getChildren()[0].write(code);
+                            getChildren()[1].write(code);
+                            code.binaryOperator(FCMPG);
+                            if (skipFor[0]) code.unaryJmpOperator(IFLE, condEnd[0]);
+                            else code.unaryJmpOperator(IFGT, condEnd[0]);
                             return;
                         }
-                        getChildren()[0].apply(mv);
-                        getChildren()[1].apply(mv);
-                        mv.visitInsn(FCMPG);
-                        mv.visitInsn(ICONST_1);
-                        Label t = new Label(), f = new Label();
-                        mv.visitJumpInsn(IF_ICMPEQ, f);
-                        mv.visitInsn(ICONST_1);
-                        mv.visitJumpInsn(GOTO, t);
-                        mv.visitLabel(f);
-                        applyFrame(mv, 0, null);
-                        mv.visitInsn(ICONST_0);
-                        mv.visitLabel(t);
-                        applyFrame(mv, 1, new Object[] { INTEGER });
+                        getChildren()[0].write(code);
+                        getChildren()[1].write(code);
+                        code.binaryOperator(FCMPG);
+                        code.pushInt(1);
+                        Frame t = new Frame(), f = new Frame();
+                        code.binaryJmpOperator(IF_ICMPEQ, f);
+                        code.pushInt(1);
+                        code.jmpOperator(GOTO, t);
+                        code.assignFrame(f);
+                        code.pushInt(0);
+                        code.assignFrame(t);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, greaterEquals, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
+                    @Override public void write(Code code) {
                         if (insideCond[0]) {
-                            getChildren()[0].apply(mv);
-                            getChildren()[1].apply(mv);
-                            mv.visitInsn(FCMPG);
-                            if (skipFor[0]) mv.visitJumpInsn(IFGE, condEnd[0]);
-                            else mv.visitJumpInsn(IFLT, condEnd[0]);
+                            getChildren()[0].write(code);
+                            getChildren()[1].write(code);
+                            code.binaryOperator(FCMPG);
+                            if (skipFor[0]) code.unaryJmpOperator(IFGE, condEnd[0]);
+                            else code.unaryJmpOperator(IFLT, condEnd[0]);
                             return;
                         }
-                        getChildren()[1].apply(mv);
-                        getChildren()[0].apply(mv);
-                        mv.visitInsn(FCMPG);
-                        mv.visitInsn(ICONST_1);
-                        Label t = new Label(), f = new Label();
-                        mv.visitJumpInsn(IF_ICMPEQ, f);
-                        mv.visitInsn(ICONST_1);
-                        mv.visitJumpInsn(GOTO, t);
-                        mv.visitLabel(f);
-                        applyFrame(mv, 0, null);
-                        mv.visitInsn(ICONST_0);
-                        mv.visitLabel(t);
-                        applyFrame(mv, 1, new Object[] { INTEGER });
+                        getChildren()[1].write(code);
+                        getChildren()[0].write(code);
+                        code.binaryOperator(FCMPG);
+                        code.pushInt(1);
+                        Frame t = new Frame(), f = new Frame();
+                        code.binaryJmpOperator(IF_ICMPEQ, f);
+                        code.pushInt(1);
+                        code.jmpOperator(GOTO, t);
+                        code.assignFrame(f);
+                        code.pushInt(0);
+                        code.assignFrame(t);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T1 }, c -> c[0]);
         factory.addProduction(T1, new Symbol[] { T }, c -> c[0]);
         factory.addProduction(T1, new Symbol[] { T1, plus, T },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
-                        getChildren()[0].apply(mv);
-                        getChildren()[1].apply(mv);
-                        mv.visitInsn(FADD);
+                    @Override public void write(Code code) {
+                        getChildren()[0].write(code);
+                        getChildren()[1].write(code);
+                        code.binaryOperator(FADD);
                     }
                 });
         factory.addProduction(T1, new Symbol[] { T1, minus, T },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
-                        getChildren()[0].apply(mv);
-                        getChildren()[1].apply(mv);
-                        mv.visitInsn(FSUB);
+                    @Override public void write(Code code) {
+                        getChildren()[0].write(code);
+                        getChildren()[1].write(code);
+                        code.binaryOperator(FSUB);
                     }
                 });
         factory.addProduction(T, new Symbol[] { T, times, F1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
-                        getChildren()[0].apply(mv);
-                        getChildren()[1].apply(mv);
-                        mv.visitInsn(FMUL);
+                    @Override public void write(Code code) {
+                        getChildren()[0].write(code);
+                        getChildren()[1].write(code);
+                        code.binaryOperator(FMUL);
                     }
                 });
         factory.addProduction(T, new Symbol[] { T, divide, F1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void apply(MethodVisitor mv) {
-                        getChildren()[0].apply(mv);
-                        getChildren()[1].apply(mv);
-                        mv.visitInsn(FDIV);
+                    @Override public void write(Code code) {
+                        getChildren()[0].write(code);
+                        getChildren()[1].write(code);
+                        code.binaryOperator(FDIV);
                     }
                 });
         factory.addProduction(T, new Symbol[] { F1 }, c -> c[0]);
         factory.addProduction(F1, new Symbol[] { F }, c -> c[0]);
         factory.addProduction(F1, new Symbol[] { plus, F1 }, c -> c[1]);
         factory.addProduction(F1, new Symbol[] { minus, F1 }, c -> new AST(c[0].getValue(), c[1]) {
-            @Override public void apply(MethodVisitor mv) {
-                getChildren()[0].apply(mv);
-                mv.visitInsn(FNEG);
+            @Override public void write(Code code) {
+                getChildren()[0].write(code);
+                code.unaryOperator(FNEG);
             }
         });
         factory.addProduction(F1, new Symbol[] { F2 }, c -> c[0]);
         factory.addProduction(E, new Symbol[] { F2 }, c -> c[0]);
         factory.addProduction(S, new Symbol[] { F2 }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void apply(MethodVisitor mv) {
-                c[0].apply(mv);
-                mv.visitInsn(POP);
+            @Override public void write(Code code) {
+                c[0].write(code);
+                code.pop();
             }
         });
         factory.addProduction(F2, new Symbol[] { increment, F }, c -> new AST(c[0].getValue(), c[1]) {
-            @Override public void apply(MethodVisitor mv) {
+            @Override public void write(Code code) {
                 if (getChildren()[0].getValue().getType() != identifier)
                     throw new RuntimeException("variable expected!");
                 int i = st.findSymbol(getChildren()[0].getValue().getValue());
-                mv.visitVarInsn(FLOAD, i);
-                mv.visitInsn(FCONST_1);
-                mv.visitInsn(FADD);
-                mv.visitVarInsn(FSTORE, i);
-                mv.visitVarInsn(FLOAD, i);
+                code.pushLocal(i);
+                code.pushFloat(1);
+                code.binaryOperator(FADD);
+                code.popToLocal(i);
+                code.pushLocal(i);
             }
         });
         factory.addProduction(F2, new Symbol[] { decrement, F }, c -> new AST(c[0].getValue(), c[1]) {
-            @Override public void apply(MethodVisitor mv) {
+            @Override public void write(Code code) {
                 if (getChildren()[0].getValue().getType() != identifier)
                     throw new RuntimeException("variable expected!");
                 int i = st.findSymbol(getChildren()[0].getValue().getValue());
-                mv.visitVarInsn(FLOAD, i);
-                mv.visitInsn(FCONST_1);
-                mv.visitInsn(FSUB);
-                mv.visitVarInsn(FSTORE, i);
-                mv.visitVarInsn(FLOAD, i);
+                code.pushLocal(i);
+                code.pushFloat(1);
+                code.binaryOperator(FSUB);
+                code.popToLocal(i);
+                code.pushLocal(i);
             }
         });
         factory.addProduction(F2, new Symbol[] { F, increment }, c -> new AST(c[1].getValue(), c[0]) {
-            @Override public void apply(MethodVisitor mv) {
+            @Override public void write(Code code) {
                 if (getChildren()[0].getValue().getType() != identifier)
                     throw new RuntimeException("variable expected!");
                 int i = st.findSymbol(getChildren()[0].getValue().getValue());
-                mv.visitVarInsn(FLOAD, i);
-                mv.visitVarInsn(FLOAD, i);
-                mv.visitInsn(FCONST_1);
-                mv.visitInsn(FADD);
-                mv.visitVarInsn(FSTORE, i);
+                code.pushLocal(i);
+                code.pushLocal(i);
+                code.pushFloat(1);
+                code.binaryOperator(FADD);
+                code.popToLocal(i);
             }
         });
         factory.addProduction(F2, new Symbol[] { F, decrement }, c -> new AST(c[1].getValue(), c[0]) {
-            @Override public void apply(MethodVisitor mv) {
+            @Override public void write(Code code) {
                 if (getChildren()[0].getValue().getType() != identifier)
                     throw new RuntimeException("variable expected!");
                 int i = st.findSymbol(getChildren()[0].getValue().getValue());
-                mv.visitVarInsn(FLOAD, i);
-                mv.visitVarInsn(FLOAD, i);
-                mv.visitInsn(FCONST_1);
-                mv.visitInsn(FSUB);
-                mv.visitVarInsn(FSTORE, i);
+                code.pushLocal(i);
+                code.pushLocal(i);
+                code.pushFloat(1);
+                code.binaryOperator(FSUB);
+                code.popToLocal(i);
             }
         });
         factory.addProduction(F, new Symbol[] { open, E, close }, c -> c[1]);
         factory.addProduction(F, new Symbol[] { number }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void apply(MethodVisitor mv) {
-                mv.visitLdcInsn(Float.valueOf(getValue().getValue()));
+            @Override public void write(Code code) {
+                code.pushFloat(Float.valueOf(getValue().getValue()));
             }
         });
         factory.addProduction(F, new Symbol[] { identifier }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void apply(MethodVisitor mv) {
-                mv.visitVarInsn(FLOAD, st.findSymbol(getValue().getValue()));
+            @Override public void write(Code code) {
+                code.pushLocal(st.findSymbol(getValue().getValue()));
             }
         });
         factory.addProduction(F, new Symbol[] { kwFalse }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void apply(MethodVisitor mv) {
+            @Override public void write(Code code) {
                 if (insideCond[0]) {
-                    if (!skipFor[0]) mv.visitJumpInsn(GOTO, condEnd[0]);
+                    if (!skipFor[0]) code.jmpOperator(GOTO, condEnd[0]);
                     return;
                 }
-                mv.visitInsn(ICONST_0);
+                code.pushInt(0);
             }
         });
         factory.addProduction(F, new Symbol[] { kwTrue }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void apply(MethodVisitor mv) {
+            @Override public void write(Code code) {
                 if (insideCond[0]) {
-                    if (skipFor[0]) mv.visitJumpInsn(GOTO, condEnd[0]);
+                    if (skipFor[0]) code.jmpOperator(GOTO, condEnd[0]);
                     return;
                 }
-                mv.visitInsn(ICONST_1);
+                code.pushInt(1);
             }
         });
         factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, S1 }, c ->
         new AST(c[0].getValue(), c[2], c[4]) {
-            @Override public void apply(MethodVisitor mv) {
-                Label end = new Label();
+            @Override public void write(Code code) {
+                Frame end = new Frame();
                 condEnd[0] = end;
                 insideCond[0] = true;
-                getChildren()[0].apply(mv);
+                getChildren()[0].write(code);
                 insideCond[0] = false;
                 st.enterScope();
-                applyFrame(mv, 0, null);
-                getChildren()[1].apply(mv);
-                removeLocals(st.exitScope());
-                mv.visitLabel(end);
-                applyFrame(mv, 0, null);
+                getChildren()[1].write(code);
+                code.chop(st.exitScope());
+                code.assignFrame(end);
             }
         });
         factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, openCurly, B, closeCurly }, c ->
                 new AST(c[0].getValue(), c[2], c[5]) {
-                    @Override public void apply(MethodVisitor mv) {
-                        Label end = new Label();
+                    @Override public void write(Code code) {
+                        Frame end = new Frame();
                         condEnd[0] = end;
                         insideCond[0] = true;
-                        getChildren()[0].apply(mv);
+                        getChildren()[0].write(code);
                         insideCond[0] = false;
                         st.enterScope();
-                        applyFrame(mv, 0, null);
-                        getChildren()[1].apply(mv);
-                        removeLocals(st.exitScope());
-                        mv.visitLabel(end);
-                        applyFrame(mv, 0, null);
+                        getChildren()[1].write(code);
+                        code.chop(st.exitScope());
+                        code.assignFrame(end);
                     }
                 }
         );
         factory.addProduction(S1, new Symbol[] { kwFor, open, S1, E, semicolon, S, close, openCurly, B, closeCurly }, c ->
                 new AST(c[0].getValue(), c[2], c[3], c[5], c[8]) {
-                    @Override public void apply(MethodVisitor mv) {
-                        Label loop = new Label(), end = new Label();
+                    @Override public void write(Code code) {
+                        Frame loop = new Frame(), end = new Frame();
                         st.enterScope();
-                        getChildren()[0].apply(mv);
-                        mv.visitLabel(loop);
-                        applyFrame(mv, 0, null);
+                        getChildren()[0].write(code);
+                        code.assignFrame(loop);
                         condEnd[0] = end;
                         insideCond[0] = true;
-                        getChildren()[1].apply(mv);
+                        getChildren()[1].write(code);
                         insideCond[0] = false;
                         st.enterScope();
-                        getChildren()[3].apply(mv);
-                        removeLocals(st.exitScope());
-                        getChildren()[2].apply(mv);
-                        mv.visitJumpInsn(GOTO, loop);
-                        removeLocals(st.exitScope());
-                        mv.visitLabel(end);
-                        applyFrame(mv, 0, null);
+                        getChildren()[3].write(code);
+                        code.chop(st.exitScope());
+                        getChildren()[2].write(code);
+                        code.jmpOperator(GOTO, loop);
+                        code.chop(st.exitScope());
+                        code.assignFrame(end);
                     }
                 });
         factory.addProduction(S1, new Symbol[] { kwFor, open, S1, E, semicolon, S, close, S1 }, c ->
                 new AST(c[0].getValue(), c[2], c[3], c[5], c[7]) {
-                    @Override public void apply(MethodVisitor mv) {
-                        Label loop = new Label(), end = new Label();
+                    @Override public void write(Code code) {
+                        Frame loop = new Frame(), end = new Frame();
                         st.enterScope();
-                        getChildren()[0].apply(mv);
-                        mv.visitLabel(loop);
-                        applyFrame(mv, 0, null);
+                        getChildren()[0].write(code);
+                        code.assignFrame(loop);
                         condEnd[0] = end;
                         insideCond[0] = true;
-                        getChildren()[1].apply(mv);
+                        getChildren()[1].write(code);
                         insideCond[0] = false;
-                        applyFrame(mv, 0, null);
                         st.enterScope();
-                        getChildren()[3].apply(mv);
-                        removeLocals(st.exitScope());
-                        getChildren()[2].apply(mv);
-                        mv.visitJumpInsn(GOTO, loop);
-                        removeLocals(st.exitScope());
-                        mv.visitLabel(end);
-                        applyFrame(mv, 0, null);
+                        getChildren()[3].write(code);
+                        code.chop(st.exitScope());
+                        getChildren()[2].write(code);
+                        code.jmpOperator(GOTO, loop);
+                        code.chop(st.exitScope());
+                        code.assignFrame(end);
                     }
                 });
         //</editor-fold>
 
         Grammar g = new Grammar(B);
-        new Parser(g).parse(t, factory).apply(mv);
-        return maxLocals;
-    }
-
-    private static int maxLocals = 1;
-    private static int localSize = 1;
-    private static List<Object> locals = new ArrayList<>();
-    static { locals.add("[Ljava/lang/String;"); }
-
-    private static void addLocal(Object type) {
-        locals.add(type);
-        if (locals.size() > maxLocals) maxLocals = locals.size();
-    }
-    private static void removeLocal() { locals.remove(locals.size() - 1); }
-    private static void removeLocals(int size) { for (int i = 0; i < size; i++) removeLocal(); }
-
-    private static void applyFrame(MethodVisitor mv, int stackSize, Object[] stack) {  // currently only manages locals
-        int newSize = locals.size(); // currently doesn't take care of longs/doubles
-        if (newSize == localSize && stackSize == 0) mv.visitFrame(F_SAME, 0, null, 0, null);
-        else if (newSize == localSize && stackSize == 1)
-            try { mv.visitFrame(F_SAME1, 0, null, 1, stack); }
-            catch (IllegalStateException e) {} // could be called twice in a row, whatever
-        else if (stackSize != 0) mv.visitFrame(F_FULL, newSize, locals.toArray(), stackSize, stack);
-        else if (newSize > localSize) mv.visitFrame(F_APPEND, newSize - localSize,
-                locals.subList(localSize, newSize).toArray(), 0, null);
-        else mv.visitFrame(F_CHOP, localSize - newSize, null, 0, null);
-        localSize = newSize;
+        new Parser(g).parse(t, factory).write(code);
     }
 }

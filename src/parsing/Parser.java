@@ -4,9 +4,9 @@ import ast.AST;
 import ast.ASTFactory;
 import automata.DFA;
 import automata.NFA;
-import javafx.util.Pair;
-import jdk.internal.org.objectweb.asm.MethodVisitor;
+import jvm.methods.Code;
 import lang.*;
+import util.Pair;
 
 import java.util.*;
 
@@ -35,22 +35,23 @@ public class Parser // SLR(1) Parser
     }
 
     public AST parse(TokenStream input, ASTFactory factory) {
+
         Stack<Pair<AST, Integer>> stack = new Stack<>();
-        stack.push(new Pair<>(null, 0));
+        stack.push(Pair.of(null, 0));
 
         while (true) {
-            Action a = action.get(new Pair<>(stack.peek().getValue(), grammar.getTerminal(input.peek())));
+            Action a = action.get(Pair.of(stack.peek().getValue(), grammar.getTerminal(input.peek())));
             switch (a.type) {
                 case SHIFT:
-                    stack.push(new Pair<>(new AST(input.peek()) {
-                        @Override public void apply(MethodVisitor mv) {}
+                    stack.push(Pair.of(new AST(input.peek()) {
+                        @Override public void write(Code code) {}
                     }, a.state));
                     input.next();
                     break;
                 case REDUCE:
                     AST[] p = new AST[a.item.index];
                     for (int i = p.length - 1; i >= 0; i--) p[i] = stack.pop().getKey();
-                    stack.push(new Pair<>(factory.generate(a.item.key, a.item.value, p),
+                    stack.push(Pair.of(factory.generate(a.item.key, a.item.value, p),
                             dfa.getTransition(stack.peek().getValue(), a.item.key)));
                     break;
                 case ACCEPT: return stack.get(1).getKey();
