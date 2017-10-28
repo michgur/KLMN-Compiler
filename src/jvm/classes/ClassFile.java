@@ -67,7 +67,7 @@ public class ClassFile implements Opcodes
         BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
         String line;
         while ((line = reader.readLine()) != null) System.out.println(line);
-//        Files.delete(t); // comment line to check .class file
+        Files.delete(t); // comment line to check .class file
     }
 
     public ConstPool getConstPool() { return constPool; }

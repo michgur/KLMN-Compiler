@@ -38,6 +38,7 @@ public class Token
     private Terminal type;
     private String value;
 
+    public Token(String value) { this(null, value); }
     public Token(Terminal type, String value) {
         this.type = type;
         this.value = value;

@@ -8,7 +8,7 @@ import test.MethodWriter;
  * ಠ^ಠ.
  * Created by Michael on 8/14/2017.
  */
-public abstract class AST
+public class AST
 {
     private Token value;
     private AST[] children;
@@ -18,10 +18,12 @@ public abstract class AST
         this.children = children;
     }
 
-    public abstract void write(MethodWriter writer);
-
     public Token getValue() { return value; }
     public AST[] getChildren() { return children; }
+
+    public AST getChild(int i) { return children[i]; }
+
+    protected void setChildren(AST... children) { this.children = children; }
 
     @Override
     public String toString() {

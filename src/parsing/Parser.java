@@ -44,9 +44,7 @@ public class Parser // SLR(1) Parser
             Action a = action.get(Pair.of(stack.peek().getValue(), grammar.getTerminal(input.peek())));
             switch (a.type) {
                 case SHIFT:
-                    stack.push(Pair.of(new AST(input.peek()) {
-                        @Override public void write(MethodWriter writer) {}
-                    }, a.state));
+                    stack.push(Pair.of(new AST(input.peek()), a.state));
                     input.next();
                     break;
                 case REDUCE:
