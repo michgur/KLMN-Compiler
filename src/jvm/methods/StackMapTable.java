@@ -6,7 +6,7 @@ import util.ByteList;
 
 import java.util.*;
 
-class StackMapTable extends AttributeInfo
+public class StackMapTable extends AttributeInfo
 {
     public static final byte SAME = 0; // to 63
     public static final byte SAME_LOCALS_1_STACK_ITEM = 64; // to 127
@@ -27,22 +27,22 @@ class StackMapTable extends AttributeInfo
     public static final byte ITEM_Uninitialized = 8;
 
     private short stackSize = 0, maxStack, maxLocals;
-    private List<Frame> frames = new ArrayList<>();
-    private Set<Frame> usedFrames = new TreeSet<>();
+    private Set<Frame> frames = new TreeSet<>(); // only used frames
     private Frame first = new Frame();
     private Frame frame = first;
 
     StackMapTable(ClassFile cls, String[] params) {
         super(cls, "StackMapTable");
         first.setOffset(-1);
-        frames.add(first);
         for (int i = 0; i < params.length; i++) store(i, params[i]);
         frame = new Frame().assign(first);
     }
 
     void setFrame(Frame frame) { this.frame = frame.assign(this.frame); }
-
-    void useFrame(Frame frame) { usedFrames.add(frame); }
+    void useFrame() {
+        frames.add(frame);
+        frame = new Frame().assign(frame);
+    }
 
     void push(String type) {
         if (isDouble(type)) push(null);
@@ -78,7 +78,7 @@ class StackMapTable extends AttributeInfo
     short getMaxStack() { return maxStack; }
     short getMaxLocals() { return maxLocals; }
 
-    int getSize() { return usedFrames.size(); }
+    int getSize() { return frames.size(); }
 
     private static boolean isDouble(String type) { return type != null && (type.equals("J") || type.equals("D")); }
 
@@ -95,11 +95,13 @@ class StackMapTable extends AttributeInfo
         }
     }
 
+    public String peekStack() { return frame.getStack().peek(); }
+
     @Override
     public ByteList toByteList() {
-        info.addShort(usedFrames.size()); // number_of_entries
+        info.addShort(frames.size()); // number_of_entries
         Frame prev = first;
-        for (Frame frame : usedFrames) {  // entries[number_of_entries]
+        for (Frame frame : frames) {  // entries[number_of_entries]
             int offsetDelta = frame.getOffset() - prev.getOffset() - 1;
 
             if (frame.getStack().empty() && frame.getLocals().equals(prev.getLocals())) {

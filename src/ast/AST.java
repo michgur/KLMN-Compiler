@@ -2,6 +2,7 @@ package ast;
 
 import jvm.methods.Code;
 import lang.Token;
+import test.MethodWriter;
 
 /**
  * ಠ^ಠ.
@@ -17,7 +18,7 @@ public abstract class AST
         this.children = children;
     }
 
-    public abstract void write(Code code);
+    public abstract void write(MethodWriter writer);
 
     public Token getValue() { return value; }
     public AST[] getChildren() { return children; }

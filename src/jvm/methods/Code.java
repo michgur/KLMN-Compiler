@@ -25,16 +25,40 @@ public class Code extends AttributeInfo implements Opcodes
 
     public void addAttribute(AttributeInfo attribute) { attributes.add(attribute); }
 
-    public void pushString(String s) {
-        code.addByte(Opcodes.LDC);
-        code.addByte(cls.getConstPool().addString(s));
-        smt.push("Ljava/lang/String;");
+    public void push(byte opcode, String type) {
+        code.addByte(opcode);
+        smt.push(type);
     }
 
-    public void pushField(byte opcode, short fieldIndex, String type) {
+    /* Push const from constPool (BYTE INDEX) onto the stack */
+    public void push(byte opcode, byte constIndex, String type) {
         code.addByte(opcode);
-        code.addShort(fieldIndex);
+        code.addByte(constIndex);
         smt.push(type);
+    }
+
+    /* Push const from constPool (SHORT INDEX) onto the stack */
+    public void push(byte opcode, short constIndex, String type) {
+        code.addByte(opcode);
+        code.addShort(constIndex);
+        smt.push(type);
+    }
+
+    /* Pop from stack to local (op takes localIndex as parameter) */
+    public void pop(byte opcode, byte localIndex) { pop(opcode, localIndex, true); }
+
+    /* Pop from stack to local */
+    public void pop(byte opcode, byte localIndex, boolean insertLocalIndex) {
+        String type = smt.pop();
+        smt.store(localIndex, type);
+        code.addByte(opcode);
+        if (insertLocalIndex) code.addByte(localIndex);
+    }
+
+    /* Pop from stack */
+    public void pop(byte opcode) {
+        smt.pop();
+        code.addByte(opcode);
     }
 
     public void invoke(byte opcode, short methodIndex, String type, int parameters) {
@@ -44,125 +68,19 @@ public class Code extends AttributeInfo implements Opcodes
         if (!type.equals("V")) smt.push(type);
     }
 
-    public void pushInt(int i) {
-        smt.push("I");
-        switch (i) {
-            case-1: code.addByte(Opcodes.ICONST_M1); return;
-            case 0: code.addByte(Opcodes.ICONST_0); return;
-            case 1: code.addByte(Opcodes.ICONST_1); return;
-            case 2: code.addByte(Opcodes.ICONST_2); return;
-            case 3: code.addByte(Opcodes.ICONST_3); return;
-            case 4: code.addByte(Opcodes.ICONST_4); return;
-            case 5: code.addByte(Opcodes.ICONST_5); return;
-            default:
-                code.addByte(Opcodes.LDC);
-                code.addByte(cls.getConstPool().addInteger(i));
-        }
-    }
-
-    public void pushFloat(float f) {
-        smt.push("F");
-        if (f == 0) code.addByte(Opcodes.FCONST_0);
-        else if (f == 1) code.addByte(Opcodes.FCONST_1);
-        else if (f == 2) code.addByte(Opcodes.FCONST_2);
-        else {
-            code.addByte(Opcodes.LDC);
-            code.addByte(cls.getConstPool().addFloat(f));
-        }
-    }
-
-    public void popToLocal(int index) {
-        String type = smt.pop();
-        smt.store(index, type);
-        switch (type) {
-            case "I":
-                switch (index) {
-                    case 0: code.addByte(Opcodes.ISTORE_0); return;
-                    case 1: code.addByte(Opcodes.ISTORE_1); return;
-                    case 2: code.addByte(Opcodes.ISTORE_2); return;
-                    case 3: code.addByte(Opcodes.ISTORE_3); return;
-                    default:
-                        code.addByte(Opcodes.ISTORE);
-                        code.addByte(index);
-                }
-            case "F":
-                switch (index) {
-                    case 0: code.addByte(Opcodes.FSTORE_0); return;
-                    case 1: code.addByte(Opcodes.FSTORE_1); return;
-                    case 2: code.addByte(Opcodes.FSTORE_2); return;
-                    case 3: code.addByte(Opcodes.FSTORE_3); return;
-                    default:
-                        code.addByte(Opcodes.FSTORE);
-                        code.addByte(index);
-                }
-        }
-    }
-
-    public void pushLocal(int index) {
-        String type = smt.load(index);
+    public void operator(byte opcode, int operands, String type) {
+        code.addByte(opcode);
+        if (operands > 0) smt.pop(operands);
         smt.push(type);
-        switch (type) {
-            case "I":
-                switch (index) {
-                    case 0: code.addByte(Opcodes.ILOAD_0); return;
-                    case 1: code.addByte(Opcodes.ILOAD_1); return;
-                    case 2: code.addByte(Opcodes.ILOAD_2); return;
-                    case 3: code.addByte(Opcodes.ILOAD_3); return;
-                    default:
-                        code.addByte(Opcodes.ILOAD);
-                        code.addByte(index);
-                }
-            case "F":
-                switch (index) {
-                    case 0: code.addByte(Opcodes.FLOAD_0); return;
-                    case 1: code.addByte(Opcodes.FLOAD_1); return;
-                    case 2: code.addByte(Opcodes.FLOAD_2); return;
-                    case 3: code.addByte(Opcodes.FLOAD_3); return;
-                    default:
-                        code.addByte(Opcodes.FLOAD);
-                        code.addByte(index);
-                }
-        }
     }
 
-    public void unaryOperator(byte opcode) { code.addByte(opcode); }
-
-    public void binaryOperator(byte opcode) {
-        code.addByte(opcode);
-        smt.pop();
-        smt.push(smt.pop()); // fixme(?)-type check
-    }
-
-    public void binaryJmpOperator(byte opcode, Frame target) {
-//        smt.useFrame(target);
-        smt.pop(2);
-        Frame here = assignFrame(new Frame(), false); // only for testing conditional code
-        code.addByte(opcode);
-        frames.putIfAbsent(target, new ArrayList<>());
-        frames.get(target).add(Pair.of(code.size(), here));
-        code.addShort(0x0000);
-    }
-    public void unaryJmpOperator(byte opcode, Frame target) {
-//        smt.useFrame(target);
-        smt.pop();
+    public void jmpOperator(byte opcode, int operands, Frame target) {
+        if (operands > 0) smt.pop(operands);
         Frame here = assignFrame(new Frame(), false);
         code.addByte(opcode);
         frames.putIfAbsent(target, new ArrayList<>());
         frames.get(target).add(Pair.of(code.size(), here));
         code.addShort(0x0000);
-    }
-    public void jmpOperator(byte opcode, Frame target) {
-//        smt.useFrame(target);
-        Frame here = assignFrame(new Frame(), false);
-        code.addByte(opcode);
-        frames.putIfAbsent(target, new ArrayList<>());
-        frames.get(target).add(Pair.of(code.size(), here));
-        code.addShort(0x0000);
-    }
-
-    public void pop() {
-        code.addByte(POP);
-        smt.pop();
     }
 
     public void chop(int amt) { smt.chop(amt); }
@@ -172,9 +90,12 @@ public class Code extends AttributeInfo implements Opcodes
         if (frame.getOffset() != -1) throw new RuntimeException(); // fixme-maybe not?
         frame.setOffset(code.size());
         smt.setFrame(frame);
-        if (use) smt.useFrame(frame);
+        if (use) smt.useFrame();
         return frame;
     }
+
+    public String getStackHeadType() { return smt.peekStack(); }
+    public String getType(int localIndex) { return smt.load(localIndex); }
 
     @Override
     public ByteList toByteList() {
@@ -184,11 +105,8 @@ public class Code extends AttributeInfo implements Opcodes
         for (Frame frame : frames.keySet())
             for (Pair<Integer, Frame> pair : frames.get(frame)) {
                 if (pair.getValue() == null ||
-                        !frame.getStack().equals(pair.getValue().getStack()) ||
-                        !frame.getLocals().equals(pair.getValue().getLocals())) {
-//                    System.out.println(pair.getValue());
-//                    throw new RuntimeException("conditional code alters frame");
-                }
+                        !frame.getStack().equals(pair.getValue().getStack()))
+                    throw new RuntimeException("conditional code alters stack");
 
                 int offset = frame.getOffset() - pair.getKey() + 1;
                 code.set(pair.getKey(), (byte) (offset >> 8 & 0xFF));

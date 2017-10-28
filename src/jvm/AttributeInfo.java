@@ -8,6 +8,7 @@ public class AttributeInfo
     private short nameIndex;
     protected ByteList info = new ByteList();
     protected ClassFile cls;
+    private boolean converted = false;
 
     public AttributeInfo(ClassFile cls, String name) {
         this.cls = cls;
@@ -17,6 +18,8 @@ public class AttributeInfo
     public ByteList getInfo() { return info; }
 
     public ByteList toByteList() {
+        if (converted) throw new RuntimeException("can only convert AttributeInfo to ByteList once!");
+        converted = true;
         ByteList data = new ByteList();
         data.addShort(nameIndex);   // attribute_name_index
         data.addInt(info.size());   // attribute_length

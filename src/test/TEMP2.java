@@ -18,7 +18,7 @@ import java.util.List;
  */
 public class TEMP2 implements Opcodes
 {
-    public static void t(ConstPool constPool, Code code, String source) throws Exception {
+    public static void t(ConstPool constPool, MethodWriter writer, String source) throws Exception {
         Language KLMN = new Language();
         TokenStream t = KLMN.tokenize(source);
 
@@ -137,23 +137,13 @@ public class TEMP2 implements Opcodes
         // TODO: specialized AST node classes (Expressions, Conditions, Loops,
         // TODO:    and Eventually Methods (with MethodInfos & Codes) & Classes (with ClassFiles))
 
-        // TODO: merge Code and these vars to some writer class
-        // TODO:    (perhaps keep the lower-level shit at Code class, and add writing funcs to the writer)
-        // TODO:    it should manage scopes and vars automatically, & help to avoid lots of repetition
-        SymbolTable st = new SymbolTable();
-        st.enterScope();
         ASTFactory factory = new ASTFactory();
-        ///////conditions
-        final Frame[] condEnd = { new Frame() }; // the end of current condition
-        final boolean[] insideCond = { false }, // whether current AST node is inside a condition
-                skipFor = { false }; // for conditions, the boolean they should skip to condEnd for
-        /////////////////
         //<editor-fold desc="Factory">
         factory.addProduction(B, new Symbol[] { S1 }, c -> new AST(new Token(null, "Block"), c[0]) {
-            @Override public void write(Code code) {
-                st.enterScope();
-                getChildren()[0].write(code);
-                code.chop(st.exitScope());
+            @Override public void write(MethodWriter writer) {
+                writer.enterScope();
+                getChildren()[0].write(writer);
+                writer.exitScope();
             }
         });
         factory.addProduction(S1, new Symbol[] { S, semicolon }, c -> c[0]);
@@ -162,427 +152,425 @@ public class TEMP2 implements Opcodes
             System.arraycopy(c[0].getChildren(), 0, children, 0, c[0].getChildren().length);
             children[children.length - 1] = c[1];
             return new AST(new Token(null, "Block"), children) {
-                @Override public void write(Code code) {
-                    st.enterScope();
-                    for (AST ast : getChildren()) ast.write(code);
-                    code.chop(st.exitScope());
+                @Override public void write(MethodWriter writer) {
+                    writer.enterScope();
+                    for (AST ast : getChildren()) ast.write(writer);
+                    writer.exitScope();
                 }
             };
         });
         factory.addProduction(S, new Symbol[] { A }, c -> c[0]);
         factory.addProduction(A, new Symbol[] { var, identifier, assign, E }, c ->
                 new AST(c[2].getValue(), c[1], c[3]) {
-                    @Override public void write(Code code) {
+                    @Override public void write(MethodWriter writer) {
                         String name = getChildren()[0].getValue().getValue();
-                        if (st.checkScope(name)) throw new RuntimeException("variable " + name + " already defined!");
-                        st.addSymbol(name);
-                        getChildren()[1].write(code);
-                        code.popToLocal(st.findSymbol(name));
+                        if (writer.checkScope(name)) throw new RuntimeException("variable " + name + " already defined!");
+                        writer.addSymbol(name);
+                        getChildren()[1].write(writer);
+                        writer.popToLocal(name);
                     }
                 });
         factory.addProduction(A, new Symbol[] { identifier, assign, E }, c ->
                 new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        getChildren()[1].write(code);// + "pop #" + st.findSymbol(getChildren()[0].getValue().getValue()) + '\n';
-                        code.popToLocal(st.findSymbol(getChildren()[0].getValue().getValue()));
+                    @Override public void write(MethodWriter writer) {
+                        getChildren()[1].write(writer);// + "pop #" + writer.findSymbol(getChildren()[0].getValue().getValue()) + '\n';
+                        writer.popToLocal(getChildren()[0].getValue().getValue());
                     }
                 });
         factory.addProduction(S, new Symbol[] { print, E }, c -> new AST(c[0].getValue(), c[1]) {
-            @Override public void write(Code code) {
-                code.pushField(GETSTATIC, constPool.addFieldref("java/lang/System", "out", 
-                        "Ljava/io/PrintStream;"), "Ljava/io/PrintStream;");
-                getChildren()[0].write(code);
-                code.invoke(INVOKEVIRTUAL, constPool.addMethodref("java/io/PrintStream", 
-                        "println", "(F)V"), "V", 1);
+            @Override public void write(MethodWriter writer) {
+                writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
+                getChildren()[0].write(writer);
+                writer.call("java/io/PrintStream", "println", "V", "F");
             }
         });
         factory.addProduction(E, new Symbol[] { T4 }, c -> c[0]);
         factory.addProduction(E, new Symbol[] { E, lOr, T4 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        if (insideCond[0]) {
-                            Frame end = condEnd[0], body = new Frame();
-                            condEnd[0] = body;
-                            skipFor[0] = !skipFor[0];
-                            getChildren()[0].write(code); // true -> skip to 'body', false -> resume
-                            skipFor[0] = !skipFor[0];
-                            condEnd[0] = end;
-                            getChildren()[1].write(code); // true -> resume, false -> skip to 'end'
-                            code.assignFrame(body);
+                    @Override public void write(MethodWriter writer) {
+                        if (writer.isInCond()) {
+                            Frame end = writer.getCondEnd(), body = new Frame();
+                            writer.setCondEnd(body);
+                            writer.setSkipFor(!writer.getSkipFor());
+                            getChildren()[0].write(writer); // true -> skip to 'body', false -> resume
+                            writer.setSkipFor(!writer.getSkipFor());
+                            writer.setCondEnd(end);
+                            getChildren()[1].write(writer); // true -> resume, false -> skip to 'end'
+                            writer.assignFrame(body);
                             return;
                         }
                         Frame cond2 = new Frame(), end = new Frame();
-                        getChildren()[0].write(code);
-                        code.unaryJmpOperator(IFEQ, cond2); // if false(=0), check other cond
-                        code.pushInt(1); // if true(=0), push true and end
-                        code.jmpOperator(GOTO, end);
-                        code.assignFrame(cond2); // here we get the final result
-                        getChildren()[1].write(code);
-                        code.assignFrame(end);
+                        getChildren()[0].write(writer);
+                        writer.useJmpOperator(IFEQ, cond2); // if false(=0), check other cond
+                        writer.pushInt(1); // if true(=0), push true and end
+                        writer.useJmpOperator(GOTO, end);
+                        writer.assignFrame(cond2); // here we get the final result
+                        getChildren()[1].write(writer);
+                        writer.assignFrame(end);
                     }
                 });
         factory.addProduction(T4, new Symbol[] { T3 }, c -> c[0]);
         factory.addProduction(T4, new Symbol[] { T4, lAnd, T3 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                @Override public void write(Code code) {
-                        if (insideCond[0]) {
-                            if (skipFor[0]) {
-                                skipFor[0] = false;
-                                getChildren()[0].write(code); // true -> skip to END, false -> resume
-                                skipFor[0] = true;
-                                getChildren()[1].write(code); // true -> skip to END, false -> resume
+                @Override public void write(MethodWriter writer) {
+                        if (writer.isInCond()) {
+                            if (writer.getSkipFor()) {
+                                writer.setSkipFor(false);
+                                getChildren()[0].write(writer); // true -> skip to END, false -> resume
+                                writer.setSkipFor(true);
+                                getChildren()[1].write(writer); // true -> skip to END, false -> resume
                                 return;
                             }
-                            getChildren()[0].write(code);
-                            getChildren()[1].write(code);
+                            getChildren()[0].write(writer);
+                            getChildren()[1].write(writer);
                             return;
                         }
                         Frame cond2 = new Frame(), end = new Frame();
-                        getChildren()[0].write(code);
-                        code.unaryJmpOperator(IFNE, cond2); // if true(=1), check other cond
-                        code.pushInt(0); // if false(=0), push false and end
-                        code.jmpOperator(GOTO, end);
-                        code.assignFrame(cond2); // here we get the final result
-                        getChildren()[1].write(code);
-                        code.assignFrame(end);
+                        getChildren()[0].write(writer);
+                        writer.useJmpOperator(IFNE, cond2); // if true(=1), check other cond
+                        writer.pushInt(0); // if false(=0), push false and end
+                        writer.useJmpOperator(GOTO, end);
+                        writer.assignFrame(cond2); // here we get the final result
+                        getChildren()[1].write(writer);
+                        writer.assignFrame(end);
                     }
                 });
         factory.addProduction(T3, new Symbol[] { T2 }, c -> c[0]);
         factory.addProduction(T3, new Symbol[] { T3, equals, T2 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        if (insideCond[0]) {
-                            getChildren()[0].write(code);
-                            getChildren()[1].write(code);
-                            code.binaryOperator(FCMPG);
-                            if (skipFor[0]) code.unaryJmpOperator(IFEQ, condEnd[0]);
-                            else code.unaryJmpOperator(IFNE, condEnd[0]);
+                    @Override public void write(MethodWriter writer) {
+                        if (writer.isInCond()) {
+                            getChildren()[0].write(writer);
+                            getChildren()[1].write(writer);
+                            writer.useOperator(FCMPG);
+                            if (writer.getSkipFor()) writer.useJmpOperator(IFEQ, writer.getCondEnd());
+                            else writer.useJmpOperator(IFNE, writer.getCondEnd());
                             return;
                         }
-                        getChildren()[0].write(code);
-                        getChildren()[1].write(code);
-                        code.binaryOperator(FCMPG);
+                        getChildren()[0].write(writer);
+                        getChildren()[1].write(writer);
+                        writer.useOperator(FCMPG);
                         Frame t = new Frame(), f = new Frame();
-                        code.unaryJmpOperator(IFNE, f);
-                        code.pushInt(1);
-                        code.jmpOperator(GOTO, t);
-                        code.assignFrame(f);
-                        code.pushInt(0);
-                        code.assignFrame(t);
+                        writer.useJmpOperator(IFNE, f);
+                        writer.pushInt(1);
+                        writer.useJmpOperator(GOTO, t);
+                        writer.assignFrame(f);
+                        writer.pushInt(0);
+                        writer.assignFrame(t);
                     }
                 });
         factory.addProduction(T3, new Symbol[] { T3, nEquals, T2 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        if (insideCond[0]) {
-                            getChildren()[0].write(code);
-                            getChildren()[1].write(code);
-                            code.binaryOperator(FCMPG);
-                            if (!skipFor[0]) code.unaryJmpOperator(IFEQ, condEnd[0]);
-                            else code.unaryJmpOperator(IFNE, condEnd[0]);
+                    @Override public void write(MethodWriter writer) {
+                        if (writer.isInCond()) {
+                            getChildren()[0].write(writer);
+                            getChildren()[1].write(writer);
+                            writer.useOperator(FCMPG);
+                            if (!writer.getSkipFor()) writer.useJmpOperator(IFEQ, writer.getCondEnd());
+                            else writer.useJmpOperator(IFNE, writer.getCondEnd());
                             return;
                         }
-                        getChildren()[0].write(code);
-                        getChildren()[1].write(code);
-                        code.binaryOperator(FCMPG);
+                        getChildren()[0].write(writer);
+                        getChildren()[1].write(writer);
+                        writer.useOperator(FCMPG);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, less, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        if (insideCond[0]) {
-                            getChildren()[0].write(code);
-                            getChildren()[1].write(code);
-                            code.binaryOperator(FCMPG);
-                            if (skipFor[0]) code.unaryJmpOperator(IFLT, condEnd[0]);
-                            else code.unaryJmpOperator(IFGE, condEnd[0]);
+                    @Override public void write(MethodWriter writer) {
+                        if (writer.isInCond()) {
+                            getChildren()[0].write(writer);
+                            getChildren()[1].write(writer);
+                            writer.useOperator(FCMPG);
+                            if (writer.getSkipFor()) writer.useJmpOperator(IFLT, writer.getCondEnd());
+                            else writer.useJmpOperator(IFGE, writer.getCondEnd());
                             return;
                         }
-                        getChildren()[1].write(code);
-                        getChildren()[0].write(code);
-                        code.binaryOperator(FCMPG);
-                        code.pushInt(1);
+                        getChildren()[1].write(writer);
+                        getChildren()[0].write(writer);
+                        writer.useOperator(FCMPG);
+                        writer.pushInt(1);
                         Frame t = new Frame(), f = new Frame();
-                        code.binaryJmpOperator(IF_ICMPNE, f);
-                        code.pushInt(1);
-                        code.jmpOperator(GOTO, t);
-                        code.assignFrame(f);
-                        code.pushInt(0);
-                        code.assignFrame(t);
+                        writer.useJmpOperator(IF_ICMPNE, f);
+                        writer.pushInt(1);
+                        writer.useJmpOperator(GOTO, t);
+                        writer.assignFrame(f);
+                        writer.pushInt(0);
+                        writer.assignFrame(t);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, greater, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        if (insideCond[0]) {
-                            getChildren()[0].write(code);
-                            getChildren()[1].write(code);
-                            code.binaryOperator(FCMPG);
-                            if (skipFor[0]) code.unaryJmpOperator(IFGT, condEnd[0]);
-                            else code.unaryJmpOperator(IFLE, condEnd[0]);
+                    @Override public void write(MethodWriter writer) {
+                        if (writer.isInCond()) {
+                            getChildren()[0].write(writer);
+                            getChildren()[1].write(writer);
+                            writer.useOperator(FCMPG);
+                            if (writer.getSkipFor()) writer.useJmpOperator(IFGT, writer.getCondEnd());
+                            else writer.useJmpOperator(IFLE, writer.getCondEnd());
                             return;
                         }
-                        getChildren()[0].write(code);
-                        getChildren()[1].write(code);
-                        code.binaryOperator(FCMPG);
-                        code.pushInt(1);
+                        getChildren()[0].write(writer);
+                        getChildren()[1].write(writer);
+                        writer.useOperator(FCMPG);
+                        writer.pushInt(1);
                         Frame t = new Frame(), f = new Frame();
-                        code.binaryJmpOperator(IF_ICMPNE, f);
-                        code.pushInt(1);
-                        code.jmpOperator(GOTO, t);
-                        code.assignFrame(f);
-                        code.pushInt(0);
-                        code.assignFrame(t);
+                        writer.useJmpOperator(IF_ICMPNE, f);
+                        writer.pushInt(1);
+                        writer.useJmpOperator(GOTO, t);
+                        writer.assignFrame(f);
+                        writer.pushInt(0);
+                        writer.assignFrame(t);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, lessEquals, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        if (insideCond[0]) {
-                            getChildren()[0].write(code);
-                            getChildren()[1].write(code);
-                            code.binaryOperator(FCMPG);
-                            if (skipFor[0]) code.unaryJmpOperator(IFLE, condEnd[0]);
-                            else code.unaryJmpOperator(IFGT, condEnd[0]);
+                    @Override public void write(MethodWriter writer) {
+                        if (writer.isInCond()) {
+                            getChildren()[0].write(writer);
+                            getChildren()[1].write(writer);
+                            writer.useOperator(FCMPG);
+                            if (writer.getSkipFor()) writer.useJmpOperator(IFLE, writer.getCondEnd());
+                            else writer.useJmpOperator(IFGT, writer.getCondEnd());
                             return;
                         }
-                        getChildren()[0].write(code);
-                        getChildren()[1].write(code);
-                        code.binaryOperator(FCMPG);
-                        code.pushInt(1);
+                        getChildren()[0].write(writer);
+                        getChildren()[1].write(writer);
+                        writer.useOperator(FCMPG);
+                        writer.pushInt(1);
                         Frame t = new Frame(), f = new Frame();
-                        code.binaryJmpOperator(IF_ICMPEQ, f);
-                        code.pushInt(1);
-                        code.jmpOperator(GOTO, t);
-                        code.assignFrame(f);
-                        code.pushInt(0);
-                        code.assignFrame(t);
+                        writer.useJmpOperator(IF_ICMPEQ, f);
+                        writer.pushInt(1);
+                        writer.useJmpOperator(GOTO, t);
+                        writer.assignFrame(f);
+                        writer.pushInt(0);
+                        writer.assignFrame(t);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, greaterEquals, T1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        if (insideCond[0]) {
-                            getChildren()[0].write(code);
-                            getChildren()[1].write(code);
-                            code.binaryOperator(FCMPG);
-                            if (skipFor[0]) code.unaryJmpOperator(IFGE, condEnd[0]);
-                            else code.unaryJmpOperator(IFLT, condEnd[0]);
+                    @Override public void write(MethodWriter writer) {
+                        if (writer.isInCond()) {
+                            getChildren()[0].write(writer);
+                            getChildren()[1].write(writer);
+                            writer.useOperator(FCMPG);
+                            if (writer.getSkipFor()) writer.useJmpOperator(IFGE, writer.getCondEnd());
+                            else writer.useJmpOperator(IFLT, writer.getCondEnd());
                             return;
                         }
-                        getChildren()[1].write(code);
-                        getChildren()[0].write(code);
-                        code.binaryOperator(FCMPG);
-                        code.pushInt(1);
+                        getChildren()[1].write(writer);
+                        getChildren()[0].write(writer);
+                        writer.useOperator(FCMPG);
+                        writer.pushInt(1);
                         Frame t = new Frame(), f = new Frame();
-                        code.binaryJmpOperator(IF_ICMPEQ, f);
-                        code.pushInt(1);
-                        code.jmpOperator(GOTO, t);
-                        code.assignFrame(f);
-                        code.pushInt(0);
-                        code.assignFrame(t);
+                        writer.useJmpOperator(IF_ICMPEQ, f);
+                        writer.pushInt(1);
+                        writer.useJmpOperator(GOTO, t);
+                        writer.assignFrame(f);
+                        writer.pushInt(0);
+                        writer.assignFrame(t);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T1 }, c -> c[0]);
         factory.addProduction(T1, new Symbol[] { T }, c -> c[0]);
         factory.addProduction(T1, new Symbol[] { T1, plus, T },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        getChildren()[0].write(code);
-                        getChildren()[1].write(code);
-                        code.binaryOperator(FADD);
+                    @Override public void write(MethodWriter writer) {
+                        getChildren()[0].write(writer);
+                        getChildren()[1].write(writer);
+                        writer.useOperator(FADD);
                     }
                 });
         factory.addProduction(T1, new Symbol[] { T1, minus, T },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        getChildren()[0].write(code);
-                        getChildren()[1].write(code);
-                        code.binaryOperator(FSUB);
+                    @Override public void write(MethodWriter writer) {
+                        getChildren()[0].write(writer);
+                        getChildren()[1].write(writer);
+                        writer.useOperator(FSUB);
                     }
                 });
         factory.addProduction(T, new Symbol[] { T, times, F1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        getChildren()[0].write(code);
-                        getChildren()[1].write(code);
-                        code.binaryOperator(FMUL);
+                    @Override public void write(MethodWriter writer) {
+                        getChildren()[0].write(writer);
+                        getChildren()[1].write(writer);
+                        writer.useOperator(FMUL);
                     }
                 });
         factory.addProduction(T, new Symbol[] { T, divide, F1 },
                 c -> new AST(c[1].getValue(), c[0], c[2]) {
-                    @Override public void write(Code code) {
-                        getChildren()[0].write(code);
-                        getChildren()[1].write(code);
-                        code.binaryOperator(FDIV);
+                    @Override public void write(MethodWriter writer) {
+                        getChildren()[0].write(writer);
+                        getChildren()[1].write(writer);
+                        writer.useOperator(FDIV);
                     }
                 });
         factory.addProduction(T, new Symbol[] { F1 }, c -> c[0]);
         factory.addProduction(F1, new Symbol[] { F }, c -> c[0]);
         factory.addProduction(F1, new Symbol[] { plus, F1 }, c -> c[1]);
         factory.addProduction(F1, new Symbol[] { minus, F1 }, c -> new AST(c[0].getValue(), c[1]) {
-            @Override public void write(Code code) {
-                getChildren()[0].write(code);
-                code.unaryOperator(FNEG);
+            @Override public void write(MethodWriter writer) {
+                getChildren()[0].write(writer);
+                writer.useOperator(FNEG);
             }
         });
         factory.addProduction(F1, new Symbol[] { F2 }, c -> c[0]);
         factory.addProduction(E, new Symbol[] { F2 }, c -> c[0]);
         factory.addProduction(S, new Symbol[] { F2 }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void write(Code code) {
-                c[0].write(code);
-                code.pop();
+            @Override public void write(MethodWriter writer) {
+                c[0].write(writer);
+                writer.pop();
             }
         });
         factory.addProduction(F2, new Symbol[] { increment, F }, c -> new AST(c[0].getValue(), c[1]) {
-            @Override public void write(Code code) {
+            @Override public void write(MethodWriter writer) {
                 if (getChildren()[0].getValue().getType() != identifier)
                     throw new RuntimeException("variable expected!");
-                int i = st.findSymbol(getChildren()[0].getValue().getValue());
-                code.pushLocal(i);
-                code.pushFloat(1);
-                code.binaryOperator(FADD);
-                code.popToLocal(i);
-                code.pushLocal(i);
+                String name = getChildren()[0].getValue().getValue();
+                writer.pushLocal(name);
+                writer.pushFloat(1);
+                writer.useOperator(FADD);
+                writer.popToLocal(name);
+                writer.pushLocal(name);
             }
         });
         factory.addProduction(F2, new Symbol[] { decrement, F }, c -> new AST(c[0].getValue(), c[1]) {
-            @Override public void write(Code code) {
+            @Override public void write(MethodWriter writer) {
                 if (getChildren()[0].getValue().getType() != identifier)
                     throw new RuntimeException("variable expected!");
-                int i = st.findSymbol(getChildren()[0].getValue().getValue());
-                code.pushLocal(i);
-                code.pushFloat(1);
-                code.binaryOperator(FSUB);
-                code.popToLocal(i);
-                code.pushLocal(i);
+                String name = getChildren()[0].getValue().getValue();
+                writer.pushLocal(name);
+                writer.pushFloat(1);
+                writer.useOperator(FSUB);
+                writer.popToLocal(name);
+                writer.pushLocal(name);
             }
         });
         factory.addProduction(F2, new Symbol[] { F, increment }, c -> new AST(c[1].getValue(), c[0]) {
-            @Override public void write(Code code) {
+            @Override public void write(MethodWriter writer) {
                 if (getChildren()[0].getValue().getType() != identifier)
                     throw new RuntimeException("variable expected!");
-                int i = st.findSymbol(getChildren()[0].getValue().getValue());
-                code.pushLocal(i);
-                code.pushLocal(i);
-                code.pushFloat(1);
-                code.binaryOperator(FADD);
-                code.popToLocal(i);
+                String name = getChildren()[0].getValue().getValue();
+                writer.pushLocal(name);
+                writer.pushLocal(name);
+                writer.pushFloat(1);
+                writer.useOperator(FADD);
+                writer.popToLocal(name);
             }
         });
         factory.addProduction(F2, new Symbol[] { F, decrement }, c -> new AST(c[1].getValue(), c[0]) {
-            @Override public void write(Code code) {
+            @Override public void write(MethodWriter writer) {
                 if (getChildren()[0].getValue().getType() != identifier)
                     throw new RuntimeException("variable expected!");
-                int i = st.findSymbol(getChildren()[0].getValue().getValue());
-                code.pushLocal(i);
-                code.pushLocal(i);
-                code.pushFloat(1);
-                code.binaryOperator(FSUB);
-                code.popToLocal(i);
+                String name = getChildren()[0].getValue().getValue();
+                writer.pushLocal(name);
+                writer.pushLocal(name);
+                writer.pushFloat(1);
+                writer.useOperator(FSUB);
+                writer.popToLocal(name);
             }
         });
         factory.addProduction(F, new Symbol[] { open, E, close }, c -> c[1]);
         factory.addProduction(F, new Symbol[] { number }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void write(Code code) {
-                code.pushFloat(Float.valueOf(getValue().getValue()));
+            @Override public void write(MethodWriter writer) {
+                writer.pushFloat(Float.valueOf(getValue().getValue()));
             }
         });
         factory.addProduction(F, new Symbol[] { identifier }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void write(Code code) {
-                code.pushLocal(st.findSymbol(getValue().getValue()));
+            @Override public void write(MethodWriter writer) {
+                writer.pushLocal(getValue().getValue());
             }
         });
         factory.addProduction(F, new Symbol[] { kwFalse }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void write(Code code) {
-                if (insideCond[0]) {
-                    if (!skipFor[0]) code.jmpOperator(GOTO, condEnd[0]);
+            @Override public void write(MethodWriter writer) {
+                if (writer.isInCond()) {
+                    if (!writer.getSkipFor()) writer.useJmpOperator(GOTO, writer.getCondEnd());
                     return;
                 }
-                code.pushInt(0);
+                writer.pushInt(0);
             }
         });
         factory.addProduction(F, new Symbol[] { kwTrue }, c -> new AST(c[0].getValue(), c[0].getChildren()) {
-            @Override public void write(Code code) {
-                if (insideCond[0]) {
-                    if (skipFor[0]) code.jmpOperator(GOTO, condEnd[0]);
+            @Override public void write(MethodWriter writer) {
+                if (writer.isInCond()) {
+                    if (writer.getSkipFor()) writer.useJmpOperator(GOTO, writer.getCondEnd());
                     return;
                 }
-                code.pushInt(1);
+                writer.pushInt(1);
             }
         });
         factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, S1 }, c ->
         new AST(c[0].getValue(), c[2], c[4]) {
-            @Override public void write(Code code) {
+            @Override public void write(MethodWriter writer) {
                 Frame end = new Frame();
-                condEnd[0] = end;
-                insideCond[0] = true;
-                getChildren()[0].write(code);
-                insideCond[0] = false;
-                st.enterScope();
-                getChildren()[1].write(code);
-                code.chop(st.exitScope());
-                code.assignFrame(end);
+                writer.setCondEnd(end);
+                writer.setInCond(true);
+                getChildren()[0].write(writer);
+                writer.setInCond(false);
+                writer.enterScope();
+                getChildren()[1].write(writer);
+                writer.exitScope();
+                writer.assignFrame(end);
             }
         });
         factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, openCurly, B, closeCurly }, c ->
                 new AST(c[0].getValue(), c[2], c[5]) {
-                    @Override public void write(Code code) {
+                    @Override public void write(MethodWriter writer) {
                         Frame end = new Frame();
-                        condEnd[0] = end;
-                        insideCond[0] = true;
-                        getChildren()[0].write(code);
-                        insideCond[0] = false;
-                        st.enterScope();
-                        getChildren()[1].write(code);
-                        code.chop(st.exitScope());
-                        code.assignFrame(end);
+                        writer.setCondEnd(end);
+                        writer.setInCond(true);
+                        getChildren()[0].write(writer);
+                        writer.setInCond(false);
+                        writer.enterScope();
+                        getChildren()[1].write(writer);
+                        writer.exitScope();
+                        writer.assignFrame(end);
                     }
                 }
         );
         factory.addProduction(S1, new Symbol[] { kwFor, open, S1, E, semicolon, S, close, openCurly, B, closeCurly }, c ->
                 new AST(c[0].getValue(), c[2], c[3], c[5], c[8]) {
-                    @Override public void write(Code code) {
+                    @Override public void write(MethodWriter writer) {
                         Frame loop = new Frame(), end = new Frame();
-                        st.enterScope();
-                        getChildren()[0].write(code);
-                        code.assignFrame(loop);
-                        condEnd[0] = end;
-                        insideCond[0] = true;
-                        getChildren()[1].write(code);
-                        insideCond[0] = false;
-                        st.enterScope();
-                        getChildren()[3].write(code);
-                        code.chop(st.exitScope());
-                        getChildren()[2].write(code);
-                        code.jmpOperator(GOTO, loop);
-                        code.chop(st.exitScope());
-                        code.assignFrame(end);
+                        writer.enterScope();
+                        getChildren()[0].write(writer);
+                        writer.assignFrame(loop);
+                        writer.setCondEnd(end);
+                        writer.setInCond(true);
+                        getChildren()[1].write(writer);
+                        writer.setInCond(false);
+                        writer.enterScope();
+                        getChildren()[3].write(writer);
+                        writer.exitScope();
+                        getChildren()[2].write(writer);
+                        writer.useJmpOperator(GOTO, loop);
+                        writer.exitScope();
+                        writer.assignFrame(end);
                     }
                 });
         factory.addProduction(S1, new Symbol[] { kwFor, open, S1, E, semicolon, S, close, S1 }, c ->
                 new AST(c[0].getValue(), c[2], c[3], c[5], c[7]) {
-                    @Override public void write(Code code) {
+                    @Override public void write(MethodWriter writer) {
                         Frame loop = new Frame(), end = new Frame();
-                        st.enterScope();
-                        getChildren()[0].write(code);
-                        code.assignFrame(loop);
-                        condEnd[0] = end;
-                        insideCond[0] = true;
-                        getChildren()[1].write(code);
-                        insideCond[0] = false;
-                        st.enterScope();
-                        getChildren()[3].write(code);
-                        code.chop(st.exitScope());
-                        getChildren()[2].write(code);
-                        code.jmpOperator(GOTO, loop);
-                        code.chop(st.exitScope());
-                        code.assignFrame(end);
+                        writer.enterScope();
+                        getChildren()[0].write(writer);
+                        writer.assignFrame(loop);
+                        writer.setCondEnd(end);
+                        writer.setInCond(true);
+                        getChildren()[1].write(writer);
+                        writer.setInCond(false);
+                        writer.enterScope();
+                        getChildren()[3].write(writer);
+                        writer.exitScope();
+                        getChildren()[2].write(writer);
+                        writer.useJmpOperator(GOTO, loop);
+                        writer.exitScope();
+                        writer.assignFrame(end);
                     }
                 });
         //</editor-fold>
 
         Grammar g = new Grammar(B);
-        new Parser(g).parse(t, factory).write(code);
+        new Parser(g).parse(t, factory).write(writer);
     }
 }

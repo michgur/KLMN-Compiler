@@ -6,6 +6,7 @@ import automata.DFA;
 import automata.NFA;
 import jvm.methods.Code;
 import lang.*;
+import test.MethodWriter;
 import util.Pair;
 
 import java.util.*;
@@ -44,7 +45,7 @@ public class Parser // SLR(1) Parser
             switch (a.type) {
                 case SHIFT:
                     stack.push(Pair.of(new AST(input.peek()) {
-                        @Override public void write(Code code) {}
+                        @Override public void write(MethodWriter writer) {}
                     }, a.state));
                     input.next();
                     break;

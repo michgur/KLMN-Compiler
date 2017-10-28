@@ -51,7 +51,7 @@ public class ClassFile implements Opcodes
 
         data.addShort(constPool.getCount());    // constant_pool_count
         data.addAll(constPool.toByteList());    // constant_pool[constant_pool_count-1]
-        data.addShort(Opcodes.ACC_PUBLIC);              // access_flags
+        data.addShort(Opcodes.ACC_PUBLIC);      // access_flags
         data.addShort(thisIndex);               // this_class
         data.addShort(superIndex);              // super_class
         data.addShort(0x0000);               // interfaces_count
@@ -67,7 +67,7 @@ public class ClassFile implements Opcodes
         BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
         String line;
         while ((line = reader.readLine()) != null) System.out.println(line);
-//        Files.delete(t);
+//        Files.delete(t); // comment line to check .class file
     }
 
     public ConstPool getConstPool() { return constPool; }

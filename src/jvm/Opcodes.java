@@ -1,7 +1,10 @@
 package jvm;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 public interface Opcodes
 {
@@ -207,6 +210,29 @@ public interface Opcodes
     byte IFNONNULL = (byte) 199; 
     byte GOTO_W = (byte) 200; 
     byte JSR_W = (byte) 201;
+
+    Set<Byte> binaryOperators = new HashSet<>(Arrays.asList( // todo: fill
+            IADD, ISUB, IDIV, IMUL, IF_ICMPEQ, IF_ICMPNE, IF_ICMPLT, IF_ICMPLE, IF_ICMPGT, IF_ICMPGE, IF_ACMPEQ, IF_ACMPNE,
+            FADD, FSUB, FDIV, FMUL, DADD, DSUB, DDIV, DMUL, LADD, LSUB, LDIV, LMUL, IREM, FREM, DREM, LREM,
+            FCMPG, FCMPL, DCMPG, DCMPL, LCMP
+    )), unaryOperators = new HashSet<>(Arrays.asList(
+            INEG, FNEG, DNEG, LNEG, IFEQ, IFNE, IFLT, IFLE, IFGT, IFGE
+    )), jmpOperators = new HashSet<>(Arrays.asList(
+            IF_ICMPEQ, IF_ICMPNE, IF_ICMPLT, IF_ICMPLE, IF_ICMPGT, IF_ICMPGE, IF_ACMPEQ, IF_ACMPNE,
+            GOTO, GOTO_W, IFEQ, IFNE, IFLT, IFLE, IFGT, IFGE
+    )), intOperators = new HashSet<>(Arrays.asList( // operators that push int onto the stack
+            IADD, ISUB, IDIV, IMUL, IREM, INEG, DCMPL, DCMPG, LCMP, FCMPG, FCMPL
+    )), floatOperators = new HashSet<>(Arrays.asList(FADD, FSUB, FDIV, FMUL, FNEG))
+    , doubleOperators = new HashSet<>(Arrays.asList(DADD, DSUB, DDIV, DMUL, DREM, DNEG))
+    , longOperators = new HashSet<>(Arrays.asList(LADD, LSUB, LDIV, LMUL, LREM, LNEG));
+    static String getType(byte opcode) {
+        if (intOperators.contains(opcode)) return "I";
+        if (longOperators.contains(opcode)) return "J";
+        if (floatOperators.contains(opcode)) return "F";
+        if (doubleOperators.contains(opcode)) return "D";
+        throw new RuntimeException("cannot find return type for opcode " + opcode);
+    }
+
 
     short ACC_PUBLIC = 0x0001;
     short ACC_PRIVATE = 0x0002;
