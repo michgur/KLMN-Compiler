@@ -1,8 +1,8 @@
-package ast.nodes;
+package klmn.nodes;
 
 import ast.AST;
 import lang.Token;
-import test.MethodWriter;
+import klmn.MethodWriter;
 
 public abstract class ExpNode extends AST {
     public ExpNode(Token value, AST... children) { super(value, children); }

@@ -16,11 +16,8 @@ public class ASTFactory
     private Map<Production, Generator> generators = new HashMap<>();
     public interface Generator { AST generate(AST[] children); }
 
-    public void addProduction(Symbol k, Symbol[] v, Generator generator) { addProduction(new Production(k, v), generator); }
-    private void addProduction(Production p, Generator generator) { generators.put(p, generator); }
-
-    public AST generate(Symbol k, Symbol[] v, AST[] children) { return generate(new Production(k, v), children); }
-    private AST generate(Production p, AST[] children) { return generators.get(p).generate(children); }
+    public void addProduction(Symbol k, Symbol[] v, Generator generator) { generators.put(new Production(k, v), generator); }
+    public AST generate(Symbol k, Symbol[] v, AST[] children) { return generators.get(new Production(k, v)).generate(children); }
 
     private static class Production extends Pair<Symbol, Symbol[]>
     {

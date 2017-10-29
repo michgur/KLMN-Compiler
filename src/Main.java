@@ -1,5 +1,5 @@
 import jvm.Opcodes;
-import test.KLMN;
+import klmn.KLMN;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;

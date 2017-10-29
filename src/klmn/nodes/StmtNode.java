@@ -1,8 +1,8 @@
-package ast.nodes;
+package klmn.nodes;
 
 import ast.AST;
 import lang.Token;
-import test.MethodWriter;
+import klmn.MethodWriter;
 
 public abstract class StmtNode extends AST {
     // todo: currently blocks (multiple statements) can also be StmtNodes. add a way to differentiate them

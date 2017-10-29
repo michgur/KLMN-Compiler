@@ -4,9 +4,7 @@ import ast.AST;
 import ast.ASTFactory;
 import automata.DFA;
 import automata.NFA;
-import jvm.methods.Code;
 import lang.*;
-import test.MethodWriter;
 import util.Pair;
 
 import java.util.*;

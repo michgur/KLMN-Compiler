@@ -1,9 +1,9 @@
-package ast.nodes;
+package klmn.nodes;
 
 import ast.AST;
 import jvm.methods.Frame;
 import lang.Token;
-import test.MethodWriter;
+import klmn.MethodWriter;
 
 import static jvm.Opcodes.GOTO;
 

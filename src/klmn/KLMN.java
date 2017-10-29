@@ -1,17 +1,12 @@
-package test;
+package klmn;
 
 import ast.AST;
 import ast.ASTFactory;
-import ast.nodes.*;
 import jvm.Opcodes;
-import jvm.classes.ConstPool;
-import jvm.methods.Code;
 import jvm.methods.Frame;
+import klmn.nodes.*;
 import lang.*;
 import parsing.Parser;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * ಠ^ಠ.
@@ -19,10 +14,19 @@ import java.util.List;
  */
 public class KLMN implements Opcodes
 {
-    public static void compile(String name, String source) throws Exception {
-        Language KLMN = new Language();
-        TokenStream t = KLMN.tokenize(source);
+    private static Language lang = new Language();
+    private static Grammar grammar;
+    private static ASTFactory factory = new ASTFactory();
 
+    private static String name = "";
+
+    public static void compile(String name, String src) throws Exception {
+        KLMN.name = name;
+        ((ModuleNode) new Parser(grammar).parse(lang.tokenize(src), factory)).run();
+    }
+
+    /* 🔥🔥🔥 ⛧ WELCOME TO HELL ⛧ 🔥🔥🔥 */
+    static {
         Symbol M = new Symbol("MODULE"), MB = new Symbol("MBody");
         Symbol B = new Symbol("BLCK"), S = new Symbol("STMT"), A = new Symbol(":="), S1 = new Symbol("STMT1");
         Symbol E = new Symbol("EXPR"), F = new Symbol("F"), F1 = new Symbol("F1"), F2 = new Symbol("F2"),
@@ -39,7 +43,7 @@ public class KLMN implements Opcodes
                 identifier = new Terminal("ID"), kwIf = new Terminal("if"), kwFor = new Terminal("for"),
                 kwTrue = new Terminal("true"), kwFalse = new Terminal("false");
 
-        KLMN.addTerminal(assign, '=').addTerminal(plus, '+').addTerminal(semicolon, ';')
+        lang.addTerminal(assign, '=').addTerminal(plus, '+').addTerminal(semicolon, ';')
                 .addTerminal(minus, '-').addTerminal(times, '*').addTerminal(lAnd, "&&").addTerminal(lOr, "||")
                 .addTerminal(divide, '/').addTerminal(open, '(').addTerminal(close, ')')
                 .addTerminal(increment, "++").addTerminal(decrement, "--")
@@ -73,7 +77,7 @@ public class KLMN implements Opcodes
                     }
                     return value.toString();
                 });
-        KLMN.ignore((src, i) -> { // ignore spaces
+        lang.ignore((src, i) -> { // ignore spaces
             char c = src.charAt(i);
             if (c != ' ' && c != '\n' && c != '\t' && c != '\r') return null;
             StringBuilder value = new StringBuilder().append(src.charAt(i));
@@ -84,7 +88,7 @@ public class KLMN implements Opcodes
             }
             return value.toString();
         });
-        KLMN.ignore((src, i) -> { // ignore comments
+        lang.ignore((src, i) -> { // ignore comments
             if (src.charAt(i) != '#') return null;
             int end = src.indexOf('\n', i);
             if (end == -1) return src.substring(i);
@@ -137,8 +141,8 @@ public class KLMN implements Opcodes
         F.addProduction(kwFalse);
         F.addProduction(identifier);
 
-        ASTFactory factory = new ASTFactory();
-        //<editor-fold desc="Factory">
+        grammar = new Grammar(M);
+
         factory.addProduction(M, new Symbol[] { B }, c -> new ModuleNode(name, c[0]));
         factory.addProduction(B, new Symbol[] { S1 }, c -> new StmtNode(new Token(null, "Block"), c[0]) {
             @Override public void write(MethodWriter writer) {
@@ -485,28 +489,24 @@ public class KLMN implements Opcodes
             }
         });
         factory.addProduction(F, new Symbol[] { kwFalse },
-            c -> new BoolExpNode(c[0].getValue(), c[0].getChildren()) {
-                @Override protected void writeCond(MethodWriter writer)
-                { if (!writer.getSkipFor()) writer.useJmpOperator(GOTO, writer.getCondEnd()); }
-                @Override protected void writeExp(MethodWriter writer) { writer.pushInt(0); }
-            });
-        factory.addProduction(F, new Symbol[] { kwTrue }, 
-            c -> new BoolExpNode(c[0].getValue(), c[0].getChildren()) {
-                @Override protected void writeCond(MethodWriter writer) 
-                { if (writer.getSkipFor()) writer.useJmpOperator(GOTO, writer.getCondEnd()); }
-                @Override protected void writeExp(MethodWriter writer) { writer.pushInt(1); }
-            });
-        factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, S1 }, 
+                c -> new BoolExpNode(c[0].getValue(), c[0].getChildren()) {
+                    @Override protected void writeCond(MethodWriter writer)
+                    { if (!writer.getSkipFor()) writer.useJmpOperator(GOTO, writer.getCondEnd()); }
+                    @Override protected void writeExp(MethodWriter writer) { writer.pushInt(0); }
+                });
+        factory.addProduction(F, new Symbol[] { kwTrue },
+                c -> new BoolExpNode(c[0].getValue(), c[0].getChildren()) {
+                    @Override protected void writeCond(MethodWriter writer)
+                    { if (writer.getSkipFor()) writer.useJmpOperator(GOTO, writer.getCondEnd()); }
+                    @Override protected void writeExp(MethodWriter writer) { writer.pushInt(1); }
+                });
+        factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, S1 },
                 c -> new IfNode(c[0].getValue(), c[2], c[4]));
-        factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, openCurly, B, closeCurly }, 
+        factory.addProduction(S1, new Symbol[] { kwIf, open, E, close, openCurly, B, closeCurly },
                 c -> new IfNode(c[0].getValue(), c[2], c[5]));
-        factory.addProduction(S1, new Symbol[] { kwFor, open, S1, E, semicolon, S, close, openCurly, B, closeCurly }, 
+        factory.addProduction(S1, new Symbol[] { kwFor, open, S1, E, semicolon, S, close, openCurly, B, closeCurly },
                 c -> new ForNode(c[0].getValue(), c[2], c[3], c[5], c[8]));
-        factory.addProduction(S1, new Symbol[] { kwFor, open, S1, E, semicolon, S, close, S1 }, 
+        factory.addProduction(S1, new Symbol[] { kwFor, open, S1, E, semicolon, S, close, S1 },
                 c -> new ForNode(c[0].getValue(), c[2], c[3], c[5], c[7]));
-        //</editor-fold>
-
-        Grammar g = new Grammar(M);
-        ((ModuleNode) new Parser(g).parse(t, factory)).run();
     }
 }

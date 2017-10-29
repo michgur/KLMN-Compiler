@@ -1,11 +1,11 @@
-package ast.nodes;
+package klmn.nodes;
 
 import ast.AST;
 import jvm.Opcodes;
 import jvm.classes.ClassFile;
 import jvm.methods.MethodInfo;
 import lang.Token;
-import test.MethodWriter;
+import klmn.MethodWriter;
 
 public class ModuleNode extends AST implements Opcodes
 {

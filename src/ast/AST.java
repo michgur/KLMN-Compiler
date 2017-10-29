@@ -1,8 +1,6 @@
 package ast;
 
-import jvm.methods.Code;
 import lang.Token;
-import test.MethodWriter;
 
 /**
  * ಠ^ಠ.

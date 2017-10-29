@@ -1,4 +1,4 @@
-package test;
+package klmn;
 
 import jvm.Opcodes;
 import jvm.classes.ConstPool;
