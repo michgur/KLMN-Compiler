@@ -2,6 +2,10 @@ package ast;
 
 import lang.Token;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * ಠ^ಠ.
  * Created by Michael on 8/14/2017.
@@ -9,19 +13,22 @@ import lang.Token;
 public class AST
 {
     private Token value;
-    private AST[] children;
+    private List<AST> children = new ArrayList<>(); // todo: make this an arraylist
 
-    public AST(Token value, AST... children) {
+    public AST(Token value, AST... children) { this(value, Arrays.asList(children)); }
+    public AST(Token value, List<AST> children) {
         this.value = value;
-        this.children = children;
+        this.children.addAll(children);
     }
 
     public Token getValue() { return value; }
-    public AST[] getChildren() { return children; }
+    public List<AST> getChildren() { return children; }
 
-    public AST getChild(int i) { return children[i]; }
-
-    protected void setChildren(AST... children) { this.children = children; }
+    public AST getChild(int i) { return children.get(i); }
+    public int addChild(AST child) {
+        children.add(child);
+        return children.size();
+    }
 
     @Override
     public String toString() {
@@ -33,12 +40,12 @@ public class AST
         if (value == null) s.append(prefix).append((last) ? "\\-[]\n" : "|-[]\n");
         else s.append(prefix).append((last) ? "\\-[" : "|-[").append(value.getValue()).append("]\n");
         prefix += (last) ? "  " : "| ";
-        if (children.length == 0) {
+        if (children.size() == 0) {
             if (last) s.append(prefix).append('\n');
             return;
         }
         s.append(prefix).append("|\n");
-        for (int i = 0; i < children.length - 1; i++) children[i].toString(s, prefix, false);
-        children[children.length - 1].toString(s, prefix, true);
+        for (int i = 0; i < children.size() - 1; i++) children.get(i).toString(s, prefix, false);
+        children.get(children.size() - 1).toString(s, prefix, true);
     }
 }

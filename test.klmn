@@ -1,5 +1,5 @@
-var n = 6;
-if (n > 5) n = 5;
-for (var i = 0; i <= n; i++)
-    for (var j = 0; j < n + 1; j++)
-        if (i > j) print i;
+private final int poo = 2;
+public int getPoo() { print poo; print 2; }
+private int poo2 = poo + 2;
+
+public void main(shit args) { print poo; }

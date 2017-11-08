@@ -23,6 +23,8 @@ public class MethodInfo implements Opcodes
         descriptorIndex = cls.getConstPool().addUtf8('(' + String.join("", params) + ')' + type);
 
         addAttribute(new Code(cls, this));
+
+        cls.getMethods().add(this);
     }
 
     public Code getCode() { return (Code) attributes.get(0); }

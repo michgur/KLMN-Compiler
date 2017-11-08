@@ -95,7 +95,7 @@ public class StackMapTable extends AttributeInfo
         }
     }
 
-    public String peekStack() { return frame.getStack().peek(); }
+    public String peekStack() { return frame.getStack().empty() ? null : frame.getStack().peek(); }
 
     @Override
     public ByteList toByteList() {

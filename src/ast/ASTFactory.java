@@ -17,7 +17,13 @@ public class ASTFactory
     public interface Generator { AST generate(AST[] children); }
 
     public void addProduction(Symbol k, Symbol[] v, Generator generator) { generators.put(new Production(k, v), generator); }
-    public AST generate(Symbol k, Symbol[] v, AST[] children) { return generators.get(new Production(k, v)).generate(children); }
+    public AST generate(Symbol k, Symbol[] v, AST[] children) {
+        Generator g = generators.get(new Production(k, v));
+        if (g == null)
+            throw new RuntimeException("AST generator for production " + k +
+                    " -> " + Arrays.toString(v) + " not found");
+        return g.generate(children);
+    }
 
     private static class Production extends Pair<Symbol, Symbol[]>
     {

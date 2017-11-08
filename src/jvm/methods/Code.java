@@ -55,16 +55,23 @@ public class Code extends AttributeInfo implements Opcodes
         if (insertLocalIndex) code.addByte(localIndex);
     }
 
+    /* Pop from stack to field */
+    public void pop(byte opcode, short field) {
+        smt.pop();
+        code.addByte(opcode);
+        code.addShort(field);
+    }
+
     /* Pop from stack */
     public void pop(byte opcode) {
         smt.pop();
         code.addByte(opcode);
     }
 
-    public void invoke(byte opcode, short methodIndex, String type, int parameters) {
+    public void invoke(byte opcode, short methodIndex, String type, int parameters, boolean isStatic) {
         code.addByte(opcode);
         code.addShort(methodIndex);
-        smt.pop(parameters + 1);
+        smt.pop(parameters + (isStatic ? 0 : 1));
         if (!type.equals("V")) smt.push(type);
     }
 
@@ -72,6 +79,11 @@ public class Code extends AttributeInfo implements Opcodes
         code.addByte(opcode);
         if (operands > 0) smt.pop(operands);
         smt.push(type);
+    }
+
+    public void retOperator(byte opcode, boolean isVoid) {
+        if (!isVoid) smt.pop();
+        code.addByte(opcode);
     }
 
     public void jmpOperator(byte opcode, int operands, Frame target) {
@@ -99,8 +111,6 @@ public class Code extends AttributeInfo implements Opcodes
 
     @Override
     public ByteList toByteList() {
-        code.addByte(Opcodes.RETURN);
-
         if (smt.getSize() != 0) attributes.add(smt);
         for (Frame frame : frames.keySet())
             for (Pair<Integer, Frame> pair : frames.get(frame)) {

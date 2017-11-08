@@ -34,4 +34,7 @@ public class Pair<K, V> {
         result = 31 * result + (v != null ? v.hashCode() : 0);
         return result;
     }
+
+    @Override
+    public String toString() { return '(' + k.toString() + ", " + v.toString() + ')'; }
 }

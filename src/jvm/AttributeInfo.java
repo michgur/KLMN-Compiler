@@ -9,6 +9,7 @@ public class AttributeInfo
     protected ByteList info = new ByteList();
     protected ClassFile cls;
     private boolean converted = false;
+    private ByteList cnvrtd;
 
     public AttributeInfo(ClassFile cls, String name) {
         this.cls = cls;
@@ -18,12 +19,13 @@ public class AttributeInfo
     public ByteList getInfo() { return info; }
 
     public ByteList toByteList() {
-        if (converted) throw new RuntimeException("can only convert AttributeInfo to ByteList once!");
+        if (converted) return cnvrtd;//throw new RuntimeException("can only convert AttributeInfo to ByteList once!");
         converted = true;
         ByteList data = new ByteList();
         data.addShort(nameIndex);   // attribute_name_index
         data.addInt(info.size());   // attribute_length
         data.addAll(info);          // info[attribute_length]
+        cnvrtd = data;
         return data;
     }
 }
