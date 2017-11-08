@@ -1,5 +1,7 @@
+# fixme: currently, you have to write return;, even if void
+
 private final int poo = 2;
-public int getPoo() { print poo; print 2; }
+public int getPoo(int a) { return (poo + a); }
 private int poo2 = poo + 2;
 
-public void main(shit args) { print poo; }
+public void main(shit args) { print getPoo(10) + getPoo(20) * 4; return; }

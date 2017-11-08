@@ -42,8 +42,10 @@ public class MethodNode extends ModuleNode.BodyNode implements Opcodes
 
         String type = ((TypeNode) getChild(1)).getJVM(writer);
         ClassFile cf = writer.getModule().getClassFile();
-        MethodInfo info = new MethodInfo(cf, getValue().getValue(), acc, type, params);
-        ((StmtNode) getChild(3)).write(new MethodWriter(moduleName, writer, true, cf.getConstPool(), info, pNames));
+        MethodWriter mw = new MethodWriter(moduleName, writer, true, cf.getConstPool(),
+                new MethodInfo(cf, getValue().getValue(), acc, type, params), pNames);
+        ((StmtNode) getChild(3)).write(mw);
+//        mw.ret();
     }
 
     @Override

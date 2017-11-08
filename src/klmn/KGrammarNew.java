@@ -3,7 +3,6 @@ package klmn;
 import ast.AST;
 import ast.ASTFactory;
 import jvm.Opcodes;
-import jvm.classes.FieldInfo;
 import jvm.methods.Frame;
 import klmn.nodes.*;
 import klmn.writing.MethodWriter;
@@ -89,7 +88,7 @@ public class KGrammarNew implements Opcodes
          openCurly = new Terminal("{"), closeCurly = new Terminal("}"),
          kwIf = new Terminal("if"), kwElse = new Terminal("else"), kwFor = new Terminal("for"),
          kwPrint = new Terminal("print"), kwFinal = new Terminal("final"), kwStatic = new Terminal("static"),
-         kwPublic = new Terminal("public"), kwPrivate = new Terminal("private");
+         kwPublic = new Terminal("public"), kwPrivate = new Terminal("private"), kwReturn = new Terminal("return");
 
         M.addProduction();
         M.addProduction(M, VD, semicolon);
@@ -123,6 +122,7 @@ public class KGrammarNew implements Opcodes
 
         SE.addProduction(A);
         SE.addProduction(id, openRound, P, closeRound); // func call, add proper id symbol
+        SE.addProduction(id, openRound, closeRound); // func call, add proper id symbol
         SE.addProduction(DI);
 
         SEP.addProduction(SE);
@@ -134,16 +134,15 @@ public class KGrammarNew implements Opcodes
         S.addProduction(kwIf, openRound, E, closeRound, S, kwElse, S);
         S.addProduction(kwFor, openRound, SEP, semicolon, E, semicolon, SEP, openRound, S);
         S.addProduction(openCurly, B, closeCurly);
+        S.addProduction(kwReturn, semicolon);
+        S.addProduction(kwReturn, E, semicolon);
 
         B.addProduction();
         B.addProduction(S);
         B.addProduction(B, S);
 
-        Symbol P0 = new Symbol("Params0");
-        P0.addProduction(E);
-        P0.addProduction(P0, comma, E);
-        P.addProduction();
-        P.addProduction(P0);
+        P.addProduction(E);
+        P.addProduction(P, comma, E);
 
         //<editor-fold desc="Expressions">
         Symbol T0 = new Symbol("Primary"), T1 = new Symbol("Prefixed"),
@@ -190,6 +189,7 @@ public class KGrammarNew implements Opcodes
         T0.addProduction(kwTrue);
         T0.addProduction(kwFalse);
         T0.addProduction(id);
+        T0.addProduction(SEP);
         //</editor-fold>
 
         grammar = new Grammar(M);
@@ -260,13 +260,39 @@ public class KGrammarNew implements Opcodes
             }
         });
         factory.addProduction(SE, new Symbol[] { id, openRound, P, closeRound }, c -> new StmtExpNode(new Token("()"), c[0], c[2]) {
+            @Override protected int typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getValue().getValue()); }
+            @Override public void writeExp(MethodWriter writer) {
+                String[] params = new String[getChild(1).getChildren().size()];
+                for (int i = 0; i < params.length; i++) {
+                    ExpNode exp = (ExpNode) getChild(1).getChild(i);
+                    params[i] = writer.getTypeEnv().jvmType(exp.getType(writer));
+                    exp.write(writer);
+                }
+                String name = getChild(0).getValue().getValue();
+                writer.callStatic(writer.getParentName(), name, writer.jvmTypeOf(name), params);
+            }
+            @Override public void writeStmt(MethodWriter writer) {
+                String[] params = new String[getChild(1).getChildren().size()];
+                for (int i = 0; i < params.length; i++) {
+                    ExpNode exp = (ExpNode) getChild(1).getChild(i);
+                    params[i] = writer.getTypeEnv().jvmType(exp.getType(writer));
+                    exp.write(writer);
+                }
+                String name = getChild(0).getValue().getValue(), type = writer.jvmTypeOf(name);
+                writer.callStatic(writer.getParentName(), name, type, params);
+                if (!type.equals("V")) writer.pop();
+            }
+        });
+        factory.addProduction(SE, new Symbol[] { id, openRound, closeRound }, c -> new StmtExpNode(new Token("()"), c[0]) {
             @Override protected int typeCheck(MethodWriter writer) { return writer.typeOf(getValue().getValue()); }
             @Override public void writeExp(MethodWriter writer) {
-                // method call- getChild(0).getValue().getValue() is the method's name, getChild(1) is the Params AST
+                String name = getChild(0).getValue().getValue();
+                writer.call(writer.getParentName(), name, writer.jvmTypeOf(name));
             }
-
             @Override public void writeStmt(MethodWriter writer) {
-                
+                String name = getChild(0).getValue().getValue(), type = writer.jvmTypeOf(name);
+                writer.call(writer.getParentName(), name, type);
+                if (!type.equals("V")) writer.pop();
             }
         });
         factory.addProduction(SE, new Symbol[] { DI }, c -> new StmtExpNode(c[0].getValue(), c[0].getChild(0)) {
@@ -283,13 +309,15 @@ public class KGrammarNew implements Opcodes
         factory.addProduction(SEP, new Symbol[] { SE }, c -> c[0]);
         factory.addProduction(SEP, new Symbol[] { VD }, c -> c[0]);
 
-        factory.addProduction(S, new Symbol[] { SEP, semicolon }, c -> c[0]);
+        factory.addProduction(S, new Symbol[] { SEP, semicolon }, c -> new StmtNode(c[0].getValue(), c[0].getChildren()) {
+            @Override public void write(MethodWriter writer) { ((StmtExpNode) c[0]).writeStmt(writer); }
+        });
         factory.addProduction(S, new Symbol[] { kwPrint, E, semicolon }, c -> new StmtNode(c[0].getValue(), c[1]) {
             @Override public void write(MethodWriter writer) {
                 writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
                 ((ExpNode) getChild(0)).write(writer);
                 writer.call("java/io/PrintStream", "println", "V",
-                        writer.getTypeManager().jvmType(((ExpNode) getChild(0)).getType(writer)));
+                        writer.getTypeEnv().jvmType(((ExpNode) getChild(0)).getType(writer)));
             }
         });
         factory.addProduction(S, new Symbol[] { kwIf, openRound, E, closeRound, S }, c -> new IfNode(c[0].getValue(), c[2], c[4]));
@@ -297,6 +325,15 @@ public class KGrammarNew implements Opcodes
         factory.addProduction(S, new Symbol[] { kwFor, openRound, SEP, semicolon, E, semicolon, SEP, closeRound, S },
                 c -> new ForNode(c[0].getValue(), c[2], c[4], c[6], c[8]));
         factory.addProduction(S, new Symbol[] { openCurly, B, closeCurly }, c -> c[1]);
+        factory.addProduction(S, new Symbol[] { kwReturn, semicolon }, c -> new StmtNode(c[0].getValue()) {
+            @Override public void write(MethodWriter writer) { writer.ret(); }
+        });
+        factory.addProduction(S, new Symbol[] { kwReturn, E, semicolon }, c -> new StmtNode(c[0].getValue(), c[1]) {
+            @Override public void write(MethodWriter writer) {
+                ((ExpNode) getChild(0)).write(writer);
+                writer.ret();
+            }
+        });
 
         factory.addProduction(B, new Symbol[] {}, c -> new StmtNode(new Token("Block")) {
             @Override public void write(MethodWriter writer) {}
@@ -309,55 +346,13 @@ public class KGrammarNew implements Opcodes
             return c[0];
         });
 
-        /*
-        S.addProduction(SEP);
-        S.addProduction(kwIf, openRound, E, closeRound, S);
-        S.addProduction(kwIf, openRound, E, closeRound, S, kwElse, S);
-        S.addProduction(kwFor, SEP, semicolon, E, semicolon, SEP, S);
-        S.addProduction(openCurly, B, closeCurly);
-
-        B.addProduction();
-        B.addProduction(S, semicolon);
-        B.addProduction(B, S, semicolon);
-
-        Symbol P0 = new Symbol("Params0");
-        P0.addProduction(E);
-        P0.addProduction(P0, comma, E);
-        P.addProduction();
-        P.addProduction(P0);*/
-
+        factory.addProduction(P, new Symbol[] { E }, c -> new AST(new Token("Params"), c[0]));
+        factory.addProduction(P, new Symbol[] { P, comma, E }, c -> {
+            c[0].addChild(c[1]);
+            return c[0];
+        });
         
         //<editor-fold desc="Expressions">
-        /*
-        
-        T5.addProduction(T5, eq, T4);
-        T5.addProduction(T5, ne, T4);
-        T5.addProduction(T4); // T5 -> T4
-        T4.addProduction(T4, lt, T3);
-        T4.addProduction(T4, gt, T3);
-        T4.addProduction(T4, le, T3);
-        T4.addProduction(T4, ge, T3);
-        T4.addProduction(T3); // T4 -> T3
-        T3.addProduction(T3, plus, T2);
-        T3.addProduction(T3, minus, T2);
-        T3.addProduction(T2); // T3 -> T
-        T2.addProduction(T2, times, T1);
-        T2.addProduction(T2, divide, T1);
-        T2.addProduction(T1);
-        T1.addProduction(DI);
-        T1.addProduction(plus, T1);
-        T1.addProduction(minus, T1);
-        T1.addProduction(T0);
-        DI.addProduction(T0, decrement);
-        DI.addProduction(T0, increment);
-        DI.addProduction(increment, T0);
-        DI.addProduction(decrement, T0);
-        T0.addProduction(openRound, E, closeRound);
-        T0.addProduction(numberL);
-        T0.addProduction(stringL);
-        T0.addProduction(kwTrue);
-        T0.addProduction(kwFalse);
-        T0.addProduction(id);*/
         factory.addProduction(E, new Symbol[] { T6 }, c -> c[0]);
         factory.addProduction(E, new Symbol[] { E, lOr, T6 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
@@ -589,7 +584,8 @@ public class KGrammarNew implements Opcodes
                     @Override public void write(MethodWriter writer) {
                         getExpChild(0).write(writer);
                         getExpChild(1).write(writer);
-                        writer.useOperator(FADD);
+//                        writer.useOperator(FADD);
+                        writer.useOperator(IADD);
                     }
                 });
         factory.addProduction(T3, new Symbol[] { T3, minus, T2 },
@@ -615,7 +611,7 @@ public class KGrammarNew implements Opcodes
                     @Override public void write(MethodWriter writer) {
                         getExpChild(0).write(writer);
                         getExpChild(1).write(writer);
-                        writer.useOperator(FMUL);
+                        writer.useOperator(IMUL);
                     }
                 });
         factory.addProduction(T2, new Symbol[] { T2, divide, T1 },
@@ -739,6 +735,10 @@ public class KGrammarNew implements Opcodes
                     { if (writer.getSkipFor()) writer.useJmpOperator(GOTO, writer.getCondEnd()); }
                     @Override protected void writeExp(MethodWriter writer) { writer.pushInt(1); }
                 });
+        factory.addProduction(T0, new Symbol[] { SEP }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
+            @Override protected int typeCheck(MethodWriter writer) { return ((StmtExpNode) c[0]).getType(writer); }
+            @Override public void write(MethodWriter writer) { ((StmtExpNode) c[0]).writeExp(writer); }
+        });
         //</editor-fold>
         //</editor-fold>
 
@@ -753,7 +753,7 @@ public class KGrammarNew implements Opcodes
                 .addTerminal(eq, "==").addTerminal(ne, "!=").addTerminal(lt, '<')
                 .addTerminal(gt, '>').addTerminal(le, "<=").addTerminal(ge, ">=")
                 .addTerminal(kwElse, "else").addTerminal(kwFinal, "final").addTerminal(kwStatic, "static")
-                .addTerminal(kwPrivate, "private").addTerminal(kwPublic, "public")
+                .addTerminal(kwPrivate, "private").addTerminal(kwPublic, "public").addTerminal(kwReturn, "return")
                 .addTerminal(numberL, (src, i) -> {
                     if (!Character.isDigit(src.charAt(i))) return null;
                     StringBuilder value = new StringBuilder().append(src.charAt(i));

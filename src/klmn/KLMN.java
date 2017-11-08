@@ -23,11 +23,12 @@ public class KLMN implements Opcodes
 
     private static String name = "";
 
+    // NEXT TODO (NOW!): proper TypeEnv
+    // BIG TODO (but for later): instead of having everything in the AST, have some module builder that gets it as a parameter
     public static void compile(String name, String src) throws Exception {
         KLMN.name = name;
         KGrammarNew.moduleName = name;
         ModuleNode module = ((ModuleNode) new Parser(KGrammarNew.grammar).parse(KGrammarNew.lang.tokenize(src), KGrammarNew.factory));
-        System.out.println(module);
         module.run();
     }
 
@@ -224,7 +225,7 @@ public class KLMN implements Opcodes
                 writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
                 ((ExpNode) getChild(0)).write();
                 writer.call("java/io/PrintStream", "println", "V",
-                        writer.getTypeManager().jvmType(((ExpNode) getChild(0)).getType()));
+                        writer.getTypeEnv().jvmType(((ExpNode) getChild(0)).getType()));
             }
         });
         factory.addProduction(E, new Symbol[] { T4 }, c -> c[0]);

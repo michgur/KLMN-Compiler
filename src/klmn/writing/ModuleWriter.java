@@ -6,7 +6,7 @@ import klmn.nodes.ModuleNode;
 public class ModuleWriter implements Opcodes
 {
     private SymbolTable st = new SymbolTable();
-    private TypeEnvironment te = new TypeEnvironment();
+    private TypeEnv te = new TypeEnv();
 
     private ModuleNode module;
 
@@ -16,6 +16,6 @@ public class ModuleWriter implements Opcodes
     }
 
     public SymbolTable getSymbolTable() { return st; }
-    public TypeEnvironment getTypeEnvironment() { return te; }
+    public TypeEnv getTypeEnvironment() { return te; }
     public ModuleNode getModule() { return module; }
 }

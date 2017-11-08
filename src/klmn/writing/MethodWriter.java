@@ -8,11 +8,12 @@ import jvm.methods.MethodInfo;
 
 public class MethodWriter implements Opcodes
 {
+    // todo: manage returns automatically
     private ConstPool constPool;
     private Code code;
 
     private SymbolTable st;
-    private TypeEnvironment tm = new TypeEnvironment();
+    private TypeEnv tm = new TypeEnv();
     // vars for writing conditions
     private Frame condEnd;
     private boolean inCond, skipFor;
@@ -35,9 +36,11 @@ public class MethodWriter implements Opcodes
     public int addType(String name, String jvmType) { return tm.add(name, jvmType); }
     public String getType(int id) { return tm.klmnType(id); }
     public int getTypeID(String type) { return tm.typeID(type); }
+    public int getJvmTypeID(String type) { return tm.jvmTypeID(type); }
 
     public Integer findSymbol(String symbol) { return st.typeOf(symbol); }
     public int typeOf(String symbol) { return st.typeOf(symbol); }
+    public String jvmTypeOf(String symbol) { return tm.jvmType(st.typeOf(symbol)); }
     public boolean checkScope(String symbol) { return st.checkScope(symbol); }
 
     public void enterScope() { st.enterScope(SymbolTable.ScopeType.BLOCK); }
@@ -49,7 +52,7 @@ public class MethodWriter implements Opcodes
     public void pushString(String value) { code.push(LDC, (byte) constPool.addString(value), "Ljava/lang/String;"); }
     public void pushInt(int value) {
         if (value <= 5 && value >= -1) code.push((byte) (ICONST_M1 + value + 1), "I");
-        code.push(LDC, (byte) constPool.addInteger(value), "I");
+        else code.push(LDC, (byte) constPool.addInteger(value), "I");
     }
     public void pushFloat(float f) {
         if (f == 0) code.push(FCONST_0, "F");
@@ -89,7 +92,7 @@ public class MethodWriter implements Opcodes
                         break;
                 } break;
             case MODULE: // field of same module
-                String type = tm.klmnType(st.typeOf(name));
+                String type = tm.jvmType(st.typeOf(name));
                 pushStaticField(parentName, name, type); // todo: something nicer and more object-oriented (variable class and shit like that)
         }
     }
@@ -137,5 +140,7 @@ public class MethodWriter implements Opcodes
     public boolean getSkipFor() { return skipFor; }
     public void setSkipFor(boolean skipFor) { this.skipFor = skipFor; }
 
-    public TypeEnvironment getTypeManager() { return tm; }
+    public TypeEnv getTypeEnv() { return tm; }
+
+    public String getParentName() { return parentName; }
 }

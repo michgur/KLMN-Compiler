@@ -11,7 +11,7 @@ public abstract class StmtExpNode extends ExpNode {
     public StmtExpNode(Token value, AST... children) { super(value, children); }
 
     @Override
-    public void write(MethodWriter writer) { }
+    public void write(MethodWriter writer) { writeExp(writer); }
 
     public abstract void writeExp(MethodWriter writer);
     public abstract void writeStmt(MethodWriter writer);
