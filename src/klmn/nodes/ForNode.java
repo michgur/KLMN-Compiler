@@ -24,7 +24,7 @@ public class ForNode extends StmtNode
         writer.enterScope();
         ((StmtNode) getChild(3)).write(writer);
         writer.exitScope();
-        ((StmtNode) getChild(2)).write(writer);
+        ((StmtExpNode) getChild(2)).writeStmt(writer);
         writer.useJmpOperator(GOTO, loop);
         writer.exitScope();
         writer.assignFrame(end);

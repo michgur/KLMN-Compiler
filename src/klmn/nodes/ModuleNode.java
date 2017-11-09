@@ -5,6 +5,7 @@ import jvm.Opcodes;
 import jvm.classes.ClassFile;
 import jvm.methods.MethodInfo;
 import klmn.writing.ModuleWriter;
+import klmn.writing.TypeEnv;
 import lang.Token;
 import klmn.writing.MethodWriter;
 
@@ -37,11 +38,8 @@ public class ModuleNode extends AST implements Opcodes
     public ClassFile getClassFile() { return classFile; }
     public MethodWriter getInitializer() { return initializer; }
 
-    public static abstract class BodyNode extends AST {
-        public BodyNode(Token value, AST... children) { super(value, children); }
-        public BodyNode(Token value, List<AST> children) { super(value, children); }
-        public abstract void write(ModuleWriter writer);
-        public abstract int getType(ModuleWriter writer);
-//        public abstract void registerSymbol(ModuleWriter writer);
+    public interface BodyNode {
+        void write(ModuleWriter writer);
+        TypeEnv.Type getType(ModuleWriter writer);
     }
 }

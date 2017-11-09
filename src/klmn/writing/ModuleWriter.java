@@ -16,6 +16,6 @@ public class ModuleWriter implements Opcodes
     }
 
     public SymbolTable getSymbolTable() { return st; }
-    public TypeEnv getTypeEnvironment() { return te; }
+    public TypeEnv getTypeEnv() { return te; }
     public ModuleNode getModule() { return module; }
 }

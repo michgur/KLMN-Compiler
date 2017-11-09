@@ -8,6 +8,8 @@ import klmn.nodes.*;
 import klmn.writing.MethodWriter;
 import lang.*;
 
+import static klmn.writing.TypeEnv.Type;
+
 public class KGrammarNew implements Opcodes
 {
     // TEMPORARY
@@ -79,7 +81,7 @@ public class KGrammarNew implements Opcodes
     static {
         Symbol M = new Symbol("Module"), VD = new Symbol("VarDecl"), FD = new Symbol("FuncDecl");
         Symbol MF = new Symbol("Modifiers"), T = new Symbol("Type"), E = new Symbol("Expression");
-        Symbol SE = new Symbol("StatementExpression"), SEP = new Symbol("StatementExpression+"),
+        Symbol SE = new Symbol("StatementExpression"),
                 S = new Symbol("Statement"), B = new Symbol("Block"), A = new Symbol("Assignment");
         Symbol P = new Symbol("Params"), PD = new Symbol("ParamsDecl"), DI = new Symbol("Decrement/Increment");
 
@@ -125,14 +127,15 @@ public class KGrammarNew implements Opcodes
         SE.addProduction(id, openRound, closeRound); // func call, add proper id symbol
         SE.addProduction(DI);
 
-        SEP.addProduction(SE);
-        SEP.addProduction(VD);
-
-        S.addProduction(SEP, semicolon);
+        S.addProduction(SE, semicolon);
+        S.addProduction(VD, semicolon);
         S.addProduction(kwPrint, E, semicolon);
         S.addProduction(kwIf, openRound, E, closeRound, S);
         S.addProduction(kwIf, openRound, E, closeRound, S, kwElse, S);
-        S.addProduction(kwFor, openRound, SEP, semicolon, E, semicolon, SEP, openRound, S);
+        Symbol FI = new Symbol("ForInit");
+        FI.addProduction(SE);
+        FI.addProduction(VD);
+        S.addProduction(kwFor, openRound, FI, semicolon, E, semicolon, SE, closeRound, S);
         S.addProduction(openCurly, B, closeCurly);
         S.addProduction(kwReturn, semicolon);
         S.addProduction(kwReturn, E, semicolon);
@@ -189,7 +192,7 @@ public class KGrammarNew implements Opcodes
         T0.addProduction(kwTrue);
         T0.addProduction(kwFalse);
         T0.addProduction(id);
-        T0.addProduction(SEP);
+        T0.addProduction(SE);
         //</editor-fold>
 
         grammar = new Grammar(M);
@@ -205,12 +208,12 @@ public class KGrammarNew implements Opcodes
             return c[0];
         });
 
-        factory.addProduction(VD, new Symbol[] { MF, T, id }, c -> new FieldNode(c[2].getValue(), c[0], c[1]));
-        factory.addProduction(VD, new Symbol[] { MF, T, A }, c -> new FieldNode(c[2].getChild(0).getValue(), c[0], c[1], c[2].getChild(1)));
+        factory.addProduction(VD, new Symbol[] { MF, T, id }, c -> new VarNode(c[2].getValue(), c[0], c[1]));
+        factory.addProduction(VD, new Symbol[] { MF, T, A }, c -> new VarNode(c[2].getChild(0).getValue(), c[0], c[1], c[2].getChild(1)));
         factory.addProduction(VD, new Symbol[] { T, id }, c ->
-                new FieldNode(c[1].getValue(), new AST(new Token("Modifiers")), c[0]));
+                new VarNode(c[1].getValue(), new AST(new Token("Modifiers")), c[0]));
         factory.addProduction(VD, new Symbol[] { T, A }, c ->
-                new FieldNode(c[1].getChild(0).getValue(), new AST(new Token("Modifiers")), c[0], c[1].getChild(1)));
+                new VarNode(c[1].getChild(0).getValue(), new AST(new Token("Modifiers")), c[0], c[1].getChild(1)));
 
         factory.addProduction(FD, new Symbol[] { MF, T, id, openRound, PD, closeRound, S },
                 c -> new MethodNode(c[2].getValue(), c[0], c[1], c[4], c[6]));
@@ -239,7 +242,7 @@ public class KGrammarNew implements Opcodes
 
         // TODO: add as E (=Expression) (create StmtExpNode class)
         factory.addProduction(A, new Symbol[] { id, assign, E }, c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
-            @Override protected int typeCheck(MethodWriter writer) {
+            @Override protected Type typeCheck(MethodWriter writer) {
                 if (getExpChild(1).getType(writer) != getExpChild(0).getType(writer)) throw new TypeException();
                 return getExpChild(1).getType(writer);
             }
@@ -252,7 +255,7 @@ public class KGrammarNew implements Opcodes
         });
 
         factory.addProduction(SE, new Symbol[] { A }, c -> new StmtExpNode(c[0].getValue(), c[0]) {
-            @Override protected int typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getChild(0).getValue().getValue()); }
+            @Override protected Type typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getChild(0).getValue().getValue()); }
             @Override public void writeExp(MethodWriter writer) { ((ExpNode) getChild(0)).write(writer); }
             @Override public void writeStmt(MethodWriter writer) {
                 ((ExpNode) getChild(0)).write(writer);
@@ -260,37 +263,37 @@ public class KGrammarNew implements Opcodes
             }
         });
         factory.addProduction(SE, new Symbol[] { id, openRound, P, closeRound }, c -> new StmtExpNode(new Token("()"), c[0], c[2]) {
-            @Override protected int typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getValue().getValue()); }
+            @Override protected Type typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getValue().getValue()); }
             @Override public void writeExp(MethodWriter writer) {
                 String[] params = new String[getChild(1).getChildren().size()];
                 for (int i = 0; i < params.length; i++) {
                     ExpNode exp = (ExpNode) getChild(1).getChild(i);
-                    params[i] = writer.getTypeEnv().jvmType(exp.getType(writer));
+                    params[i] = exp.getType(writer).getDescriptor();
                     exp.write(writer);
                 }
                 String name = getChild(0).getValue().getValue();
-                writer.callStatic(writer.getParentName(), name, writer.jvmTypeOf(name), params);
+                writer.callStatic(writer.getParentName(), name, writer.typeOf(name).getDescriptor(), params);
             }
             @Override public void writeStmt(MethodWriter writer) {
                 String[] params = new String[getChild(1).getChildren().size()];
                 for (int i = 0; i < params.length; i++) {
                     ExpNode exp = (ExpNode) getChild(1).getChild(i);
-                    params[i] = writer.getTypeEnv().jvmType(exp.getType(writer));
+                    params[i] = exp.getType(writer).getDescriptor();
                     exp.write(writer);
                 }
-                String name = getChild(0).getValue().getValue(), type = writer.jvmTypeOf(name);
+                String name = getChild(0).getValue().getValue(), type = writer.typeOf(name).getDescriptor();
                 writer.callStatic(writer.getParentName(), name, type, params);
                 if (!type.equals("V")) writer.pop();
             }
         });
         factory.addProduction(SE, new Symbol[] { id, openRound, closeRound }, c -> new StmtExpNode(new Token("()"), c[0]) {
-            @Override protected int typeCheck(MethodWriter writer) { return writer.typeOf(getValue().getValue()); }
+            @Override protected Type typeCheck(MethodWriter writer) { return writer.typeOf(getValue().getValue()); }
             @Override public void writeExp(MethodWriter writer) {
                 String name = getChild(0).getValue().getValue();
-                writer.call(writer.getParentName(), name, writer.jvmTypeOf(name));
+                writer.call(writer.getParentName(), name, writer.typeOf(name).getDescriptor());
             }
             @Override public void writeStmt(MethodWriter writer) {
-                String name = getChild(0).getValue().getValue(), type = writer.jvmTypeOf(name);
+                String name = getChild(0).getValue().getValue(), type = writer.typeOf(name).getDescriptor();
                 writer.call(writer.getParentName(), name, type);
                 if (!type.equals("V")) writer.pop();
             }
@@ -301,30 +304,38 @@ public class KGrammarNew implements Opcodes
                 ((ExpNode) c[0]).write(writer);
                 writer.pop();
             }
-            @Override protected int typeCheck(MethodWriter writer) {
+            @Override protected Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
         });
 
-        factory.addProduction(SEP, new Symbol[] { SE }, c -> c[0]);
-        factory.addProduction(SEP, new Symbol[] { VD }, c -> c[0]);
-
-        factory.addProduction(S, new Symbol[] { SEP, semicolon }, c -> new StmtNode(c[0].getValue(), c[0].getChildren()) {
+        factory.addProduction(S, new Symbol[] { SE, semicolon }, c -> new StmtNode(c[0].getValue(), c[0].getChildren()) {
             @Override public void write(MethodWriter writer) { ((StmtExpNode) c[0]).writeStmt(writer); }
         });
+        factory.addProduction(S, new Symbol[] { VD, semicolon }, c -> c[0]);
         factory.addProduction(S, new Symbol[] { kwPrint, E, semicolon }, c -> new StmtNode(c[0].getValue(), c[1]) {
             @Override public void write(MethodWriter writer) {
                 writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
                 ((ExpNode) getChild(0)).write(writer);
                 writer.call("java/io/PrintStream", "println", "V",
-                        writer.getTypeEnv().jvmType(((ExpNode) getChild(0)).getType(writer)));
+                        ((ExpNode) getChild(0)).getType(writer).getDescriptor());
             }
         });
         factory.addProduction(S, new Symbol[] { kwIf, openRound, E, closeRound, S }, c -> new IfNode(c[0].getValue(), c[2], c[4]));
         // todo: S.addProduction(kwIf, openRound, E, closeRound, S, kwElse, S);
-        factory.addProduction(S, new Symbol[] { kwFor, openRound, SEP, semicolon, E, semicolon, SEP, closeRound, S },
+        factory.addProduction(FI, new Symbol[] { SE }, c -> new StmtNode(c[0].getValue(), c[0].getChildren()) {
+            @Override public void write(MethodWriter writer) { ((StmtExpNode) c[0]).writeStmt(writer); }
+        });
+        factory.addProduction(FI, new Symbol[] { VD }, c -> c[0]);
+        factory.addProduction(S, new Symbol[] { kwFor, openRound, FI, semicolon, E, semicolon, SE, closeRound, S },
                 c -> new ForNode(c[0].getValue(), c[2], c[4], c[6], c[8]));
-        factory.addProduction(S, new Symbol[] { openCurly, B, closeCurly }, c -> c[1]);
+        factory.addProduction(S, new Symbol[] { openCurly, B, closeCurly }, c -> new StmtNode(c[1].getValue(), c[1].getChildren()) {
+            @Override public void write(MethodWriter writer) {
+                writer.enterScope();
+                ((StmtNode) c[1]).write(writer);
+                writer.exitScope();
+            }
+        });
         factory.addProduction(S, new Symbol[] { kwReturn, semicolon }, c -> new StmtNode(c[0].getValue()) {
             @Override public void write(MethodWriter writer) { writer.ret(); }
         });
@@ -356,8 +367,8 @@ public class KGrammarNew implements Opcodes
         factory.addProduction(E, new Symbol[] { T6 }, c -> c[0]);
         factory.addProduction(E, new Symbol[] { E, lOr, T6 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int b = writer.getTypeID("boolean");
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type b = writer.getTypeEnv().getForName("boolean");
                         if (getExpChild(0).getType(writer) != b || getExpChild(1).getType(writer) != b) throw new TypeException();
                         return b;
                     }
@@ -385,8 +396,8 @@ public class KGrammarNew implements Opcodes
         factory.addProduction(T6, new Symbol[] { T5 }, c -> c[0]);
         factory.addProduction(T6, new Symbol[] { T6, lAnd, T5 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int b = writer.getTypeID("boolean");
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type b = writer.getTypeEnv().getForName("boolean");
                         if (getExpChild(0).getType(writer) != b || getExpChild(1).getType(writer) != b) throw new TypeException();
                         return b;
                     }
@@ -415,8 +426,8 @@ public class KGrammarNew implements Opcodes
         factory.addProduction(T5, new Symbol[] { T4 }, c -> c[0]);
         factory.addProduction(T5, new Symbol[] { T5, eq, T4 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -442,8 +453,8 @@ public class KGrammarNew implements Opcodes
                 });
         factory.addProduction(T5, new Symbol[] { T5, ne, T4 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -462,8 +473,8 @@ public class KGrammarNew implements Opcodes
                 });
         factory.addProduction(T4, new Symbol[] { T4, lt, T3 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -490,8 +501,8 @@ public class KGrammarNew implements Opcodes
                 });
         factory.addProduction(T4, new Symbol[] { T4, gt, T3 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -518,8 +529,8 @@ public class KGrammarNew implements Opcodes
                 });
         factory.addProduction(T4, new Symbol[] { T4, le, T3 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -546,8 +557,8 @@ public class KGrammarNew implements Opcodes
                 });
         factory.addProduction(T4, new Symbol[] { T4, ge, T3 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -576,8 +587,8 @@ public class KGrammarNew implements Opcodes
         factory.addProduction(T3, new Symbol[] { T2 }, c -> c[0]);
         factory.addProduction(T3, new Symbol[] { T3, plus, T2 },
                 c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -590,8 +601,8 @@ public class KGrammarNew implements Opcodes
                 });
         factory.addProduction(T3, new Symbol[] { T3, minus, T2 },
                 c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -603,8 +614,8 @@ public class KGrammarNew implements Opcodes
                 });
         factory.addProduction(T2, new Symbol[] { T2, times, T1 },
                 c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -616,8 +627,8 @@ public class KGrammarNew implements Opcodes
                 });
         factory.addProduction(T2, new Symbol[] { T2, divide, T1 },
                 c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public int typeCheck(MethodWriter writer) {
-                        int t = getExpChild(0).getType(writer); // todo: something better
+                    @Override public Type typeCheck(MethodWriter writer) {
+                        Type t = getExpChild(0).getType(writer); // todo: something better
                         if (getExpChild(1).getType(writer) != t) throw new TypeException();
                         return t;
                     }
@@ -631,7 +642,7 @@ public class KGrammarNew implements Opcodes
         factory.addProduction(T1, new Symbol[] { T0 }, c -> c[0]);
         factory.addProduction(T1, new Symbol[] { plus, T1 }, c -> c[1]);
         factory.addProduction(T1, new Symbol[] { minus, T1 }, c -> new ExpNode(c[0].getValue(), c[1]) {
-            @Override public int typeCheck(MethodWriter writer) {
+            @Override public Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
             @Override public void write(MethodWriter writer) {
@@ -641,7 +652,7 @@ public class KGrammarNew implements Opcodes
         });
         factory.addProduction(T1, new Symbol[] { DI }, c -> c[0]);
         factory.addProduction(DI, new Symbol[] { increment, T0 }, c -> new ExpNode(c[0].getValue(), c[1]) {
-            @Override public int typeCheck(MethodWriter writer) {
+            @Override public Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
             @Override public void write(MethodWriter writer) {
@@ -656,7 +667,7 @@ public class KGrammarNew implements Opcodes
             }
         });
         factory.addProduction(DI, new Symbol[] { decrement, T0 }, c -> new ExpNode(c[0].getValue(), c[1]) {
-            @Override public int typeCheck(MethodWriter writer) {
+            @Override public Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
             @Override public void write(MethodWriter writer) {
@@ -671,7 +682,7 @@ public class KGrammarNew implements Opcodes
             }
         });
         factory.addProduction(DI, new Symbol[] { T0, increment }, c -> new ExpNode(c[1].getValue(), c[0]) {
-            @Override public int typeCheck(MethodWriter writer) {
+            @Override public Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
             @Override public void write(MethodWriter writer) {
@@ -686,7 +697,7 @@ public class KGrammarNew implements Opcodes
             }
         });
         factory.addProduction(DI, new Symbol[] { T0, decrement }, c -> new ExpNode(c[1].getValue(), c[0]) {
-            @Override public int typeCheck(MethodWriter writer) {
+            @Override public Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
             @Override public void write(MethodWriter writer) {
@@ -702,41 +713,41 @@ public class KGrammarNew implements Opcodes
         });
         factory.addProduction(T0, new Symbol[] { openRound, E, closeRound }, c -> c[1]);
         factory.addProduction(T0, new Symbol[] { numberL }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
-            @Override public int typeCheck(MethodWriter writer) {
+            @Override public Type typeCheck(MethodWriter writer) {
                 if (getValue().getValue().contains(".") || getValue().getValue().endsWith("T0")
-                        || getValue().getValue().endsWith("f")) return writer.getTypeID("float");
-                return writer.getTypeID("int");
+                        || getValue().getValue().endsWith("f")) return writer.getTypeEnv().getForName("float");
+                return writer.getTypeEnv().getForName("int");
             }
             @Override public void write(MethodWriter writer) {
-                if (getType(writer) == writer.getTypeID("float"))
+                if (getType(writer) == writer.getTypeEnv().getForName("float"))
                     writer.pushFloat(Float.valueOf(getValue().getValue()));
                 else writer.pushInt(Integer.valueOf(getValue().getValue()));
             }
         });
         factory.addProduction(T0, new Symbol[] { stringL }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
-            @Override public int typeCheck(MethodWriter writer) { return writer.getTypeID("string"); }
+            @Override public Type typeCheck(MethodWriter writer) { return writer.getTypeEnv().getForName("string"); }
             @Override public void write(MethodWriter writer) { writer.pushString(getValue().getValue().substring(2)); }
         });
         factory.addProduction(T0, new Symbol[] { id }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
-            @Override public int typeCheck(MethodWriter writer) { return writer.typeOf(getValue().getValue()); }
+            @Override public Type typeCheck(MethodWriter writer) { return writer.typeOf(getValue().getValue()); }
             @Override public void write(MethodWriter writer) { writer.pushLocal(getValue().getValue()); }
         });
         factory.addProduction(T0, new Symbol[] { kwFalse },
                 c -> new BoolExpNode(c[0].getValue(), c[0].getChildren()) {
-                    @Override public int typeCheck(MethodWriter writer) { return writer.getTypeID("boolean"); }
+                    @Override public Type typeCheck(MethodWriter writer) { return writer.getTypeEnv().getForName("boolean"); }
                     @Override protected void writeCond(MethodWriter writer)
                     { if (!writer.getSkipFor()) writer.useJmpOperator(GOTO, writer.getCondEnd()); }
                     @Override protected void writeExp(MethodWriter writer) { writer.pushInt(0); }
                 });
         factory.addProduction(T0, new Symbol[] { kwTrue },
                 c -> new BoolExpNode(c[0].getValue(), c[0].getChildren()) {
-                    @Override public int typeCheck(MethodWriter writer) { return writer.getTypeID("boolean"); }
+                    @Override public Type typeCheck(MethodWriter writer) { return writer.getTypeEnv().getForName("boolean"); }
                     @Override protected void writeCond(MethodWriter writer)
                     { if (writer.getSkipFor()) writer.useJmpOperator(GOTO, writer.getCondEnd()); }
                     @Override protected void writeExp(MethodWriter writer) { writer.pushInt(1); }
                 });
-        factory.addProduction(T0, new Symbol[] { SEP }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
-            @Override protected int typeCheck(MethodWriter writer) { return ((StmtExpNode) c[0]).getType(writer); }
+        factory.addProduction(T0, new Symbol[] { SE }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
+            @Override protected Type typeCheck(MethodWriter writer) { return ((StmtExpNode) c[0]).getType(writer); }
             @Override public void write(MethodWriter writer) { ((StmtExpNode) c[0]).writeExp(writer); }
         });
         //</editor-fold>

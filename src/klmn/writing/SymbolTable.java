@@ -7,17 +7,23 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 
+import static klmn.writing.TypeEnv.Type;
+
 public class SymbolTable
 {
     private Deque<Scope> st = new ArrayDeque<>();
 
-    public void addSymbol(String symbol, int type) { st.peek().getKey().put(symbol, Pair.of(st.peek().index++, type)); }
+    public void addSymbol(String symbol, Type type) {
+        for (Scope scope : st)
+            if (scope.getKey().containsKey(symbol)) throw new RuntimeException("symbol " + symbol + " already defined!");
+        st.peek().getKey().put(symbol, Pair.of(st.peek().index++, type));
+    }
     public int findSymbol(String symbol) {
         for (Scope scope : st)
             if (scope.getKey().containsKey(symbol)) return scope.getKey().get(symbol).getKey();
         throw new RuntimeException("symbol " + symbol + " not defined!");
     }
-    public int typeOf(String symbol) {
+    public Type typeOf(String symbol) {
         for (Scope scope : st)
             if (scope.getKey().containsKey(symbol)) return scope.getKey().get(symbol).getValue();
         throw new RuntimeException("symbol " + symbol + " not defined!");
@@ -35,7 +41,7 @@ public class SymbolTable
 
     public enum ScopeType { MODULE, CLASS, FUNCTION, BLOCK }
 
-    private static class Scope extends Pair<Map<String, Pair<Integer, Integer>>, ScopeType> {
+    private static class Scope extends Pair<Map<String, Pair<Integer, Type>>, ScopeType> {
         private int index;
         private Scope(int index, ScopeType type) {
             super(new HashMap<>(), type);

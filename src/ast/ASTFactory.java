@@ -22,6 +22,7 @@ public class ASTFactory
         if (g == null)
             throw new RuntimeException("AST generator for production " + k +
                     " -> " + Arrays.toString(v) + " not found");
+//        System.out.println(k + " -> " + Arrays.toString(v));
         return g.generate(children);
     }
 

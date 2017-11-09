@@ -30,17 +30,11 @@ public class MethodWriter implements Opcodes
         if (paramNames.length != paramTypes.length)
             throw new RuntimeException("Parameter names array's length doesn't match with method");
         for (int i = 0; i < paramNames.length; i++)
-            st.addSymbol(paramNames[i], tm.jvmTypeID(paramTypes[i]));
+            st.addSymbol(paramNames[i], tm.getForDescriptor(paramTypes[i]));
     }
 
-    public int addType(String name, String jvmType) { return tm.add(name, jvmType); }
-    public String getType(int id) { return tm.klmnType(id); }
-    public int getTypeID(String type) { return tm.typeID(type); }
-    public int getJvmTypeID(String type) { return tm.jvmTypeID(type); }
-
-    public Integer findSymbol(String symbol) { return st.typeOf(symbol); }
-    public int typeOf(String symbol) { return st.typeOf(symbol); }
-    public String jvmTypeOf(String symbol) { return tm.jvmType(st.typeOf(symbol)); }
+    public int findSymbol(String symbol) { return st.findSymbol(symbol); }
+    public TypeEnv.Type typeOf(String symbol) { return st.typeOf(symbol); }
     public boolean checkScope(String symbol) { return st.checkScope(symbol); }
 
     public void enterScope() { st.enterScope(SymbolTable.ScopeType.BLOCK); }
@@ -92,7 +86,7 @@ public class MethodWriter implements Opcodes
                         break;
                 } break;
             case MODULE: // field of same module
-                String type = tm.jvmType(st.typeOf(name));
+                String type = st.typeOf(name).getDescriptor();
                 pushStaticField(parentName, name, type); // todo: something nicer and more object-oriented (variable class and shit like that)
         }
     }
@@ -143,4 +137,6 @@ public class MethodWriter implements Opcodes
     public TypeEnv getTypeEnv() { return tm; }
 
     public String getParentName() { return parentName; }
+
+    public SymbolTable getSymbolTable() { return st; }
 }

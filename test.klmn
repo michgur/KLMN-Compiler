@@ -1,7 +1,13 @@
 # fixme: currently, you have to write return;, even if void
 
-private final int poo = 2;
-public int getPoo(int a) { return (poo + a); }
-private int poo2 = poo + 2;
+#private final int poo = 2;
+#public int getPoo(int a) { return (poo + a); }
+#private int poo2 = poo + 2;
 
-public void main(shit args) { print getPoo(10) + getPoo(20) * 4; return; }
+# until I implement type checking properly, only use floats (vars & literals)
+public void main(shit args) {
+    float i;
+    for (i = 0.0; i < 5.0; i++)
+        print i;
+    return;
+}

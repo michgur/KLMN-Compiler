@@ -116,7 +116,7 @@ public class Code extends AttributeInfo implements Opcodes
             for (Pair<Integer, Frame> pair : frames.get(frame)) {
                 if (pair.getValue() == null ||
                         !frame.getStack().equals(pair.getValue().getStack()))
-                    throw new RuntimeException("conditional code alters stack");
+                    throw new RuntimeException("conditional code alters stack (" + frame.getStack() +  "->" + pair.getValue().getStack() + ')');
 
                 int offset = frame.getOffset() - pair.getKey() + 1;
                 code.set(pair.getKey(), (byte) (offset >> 8 & 0xFF));
