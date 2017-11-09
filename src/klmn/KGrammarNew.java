@@ -285,16 +285,16 @@ public class KGrammarNew implements Opcodes
                 writer.callStatic(writer.getParentName(), name, type, params);
                 if (!type.equals("V")) writer.pop();
             }
-        });
+        }); // todo: validate parameter types & amount
         factory.addProduction(SE, new Symbol[] { id, openRound, closeRound }, c -> new StmtExpNode(new Token("()"), c[0]) {
-            @Override protected Type typeCheck(MethodWriter writer) { return writer.typeOf(getValue().getValue()); }
+            @Override protected Type typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getValue().getValue()); }
             @Override public void writeExp(MethodWriter writer) {
                 String name = getChild(0).getValue().getValue();
-                writer.call(writer.getParentName(), name, writer.typeOf(name).getDescriptor());
+                writer.callStatic(writer.getParentName(), name, writer.typeOf(name).getDescriptor());
             }
             @Override public void writeStmt(MethodWriter writer) {
                 String name = getChild(0).getValue().getValue(), type = writer.typeOf(name).getDescriptor();
-                writer.call(writer.getParentName(), name, type);
+                writer.callStatic(writer.getParentName(), name, type);
                 if (!type.equals("V")) writer.pop();
             }
         });
@@ -595,8 +595,7 @@ public class KGrammarNew implements Opcodes
                     @Override public void write(MethodWriter writer) {
                         getExpChild(0).write(writer);
                         getExpChild(1).write(writer);
-//                        writer.useOperator(FADD);
-                        writer.useOperator(IADD);
+                        writer.useOperator(FADD);
                     }
                 });
         factory.addProduction(T3, new Symbol[] { T3, minus, T2 },
