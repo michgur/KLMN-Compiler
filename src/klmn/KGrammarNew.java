@@ -359,7 +359,7 @@ public class KGrammarNew implements Opcodes
 
         factory.addProduction(P, new Symbol[] { E }, c -> new AST(new Token("Params"), c[0]));
         factory.addProduction(P, new Symbol[] { P, comma, E }, c -> {
-            c[0].addChild(c[1]);
+            c[0].addChild(c[2]);
             return c[0];
         });
         

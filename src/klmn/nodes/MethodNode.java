@@ -44,6 +44,7 @@ public class MethodNode extends AST implements ModuleNode.BodyNode, Opcodes
         MethodWriter mw = new MethodWriter(moduleName, writer, true, cf.getConstPool(),
                 new MethodInfo(cf, getValue().getValue(), acc, type, params), pNames);
         ((StmtNode) getChild(3)).write(mw);
+        writer.getSymbolTable().exitScope();
 //        mw.ret();
     }
 
