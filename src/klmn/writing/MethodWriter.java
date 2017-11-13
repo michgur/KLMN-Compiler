@@ -15,7 +15,7 @@ public class MethodWriter implements Opcodes
     private TypeEnv tm = new TypeEnv();
     // vars for writing conditions
     private Frame condEnd;
-    private boolean inCond = false, skipFor = false, returned = false;
+    private boolean inCond = false, skipFor = false;
 
     private String parentName;
 
@@ -43,6 +43,8 @@ public class MethodWriter implements Opcodes
         code.chop(size);
     }
 
+    /* has the CURRENT SCOPE returned. todo- something clearer
+    * (I depend here on the SymbolTable since currently it's the only scope-dependent class) */
     public boolean hasReturned() { return st.hasRet(); }
 
     public void pushNull() { code.push(ACONST_NULL, null); }

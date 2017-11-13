@@ -1,14 +1,8 @@
 import jvm.Opcodes;
 import klmn.KLMN;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Stack;
 
 /**
  * ಠ^ಠ.

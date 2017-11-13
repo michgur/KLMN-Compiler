@@ -11,17 +11,11 @@ public void main(shit args) {
     }
 }
 
-# (int, int) a = (1, 2), b, c = (3, 4) # a -> (1, 2), b -> null, c -> (3, 4)
-# (int, int) a, b = (1, 2) # a -> null, b -> (1, 2)
-# (int, int) (a, b) = (1, 2) # a:int -> 1, b:int -> 2
-# don't do anything too complicated with these (no generic tuples or anything)
-#   a. not the intention, these are just here to replace structs
-#   b. will create unclear syntax
-#   c. will be more difficult to implement & less efficient overall
 #
+# Compiler Structure:
+#   Grammar is composed of Symbols (Terminals & non-Terminals), and their productions.
+#   Tokenizer splits source code into Tokens. Each Token is associated with a corresponding Terminal Symbol.
+#   ASTFactory defines behavior for all Symbol productions.
+#   Parser takes Grammar & Factory, generates an AST.
+#   The AST nodes can contain specific instructions for code generation (defined in the ASTFactory).
 #
-# official syntax:
-# type id[ = value][, id[ = value]...] ;
-# WHERE type can be: type name, array, or tuple (maybe generics in the future)
-#       id can be:   name, multiple names surrounded with parentheses
-#       value can be: expression, multiple expressions surrounded with parentheses

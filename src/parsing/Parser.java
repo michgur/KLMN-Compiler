@@ -33,7 +33,7 @@ public class Parser // SLR(1) Parser
         action = Action.generateActionMap(grammar, dfa);
     }
 
-    public AST parse(TokenStream input, ASTFactory factory) {
+    public AST parse(Tokenizer.TokenStream input, ASTFactory factory) {
 
         Stack<Pair<AST, Integer>> stack = new Stack<>();
         stack.push(Pair.of(null, 0));
