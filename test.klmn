@@ -5,7 +5,10 @@ public float max(float a, float b) {
 
 # until I implement type checking properly, only use floats (vars & literals)
 public void main(shit args) {
-    print max(1f, 2f);
+    for (float i = 0f; i < 50000f; i++) {
+        if (i == max(i, 3f)) return;
+        print i;
+    }
 }
 
 # (int, int) a = (1, 2), b, c = (3, 4) # a -> (1, 2), b -> null, c -> (3, 4)

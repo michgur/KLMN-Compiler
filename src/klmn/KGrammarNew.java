@@ -329,9 +329,9 @@ public class KGrammarNew implements Opcodes
             @Override public void write(MethodWriter writer) {
                 writer.enterScope();
                 ((StmtNode) c[1]).write(writer);
-                if (writer.hasReturned(SymbolTable.ScopeType.BLOCK)) {
+                if (writer.hasReturned()) {
                     writer.exitScope();
-                    writer.ret();
+                    writer.getSymbolTable().ret();
                 }
                 else writer.exitScope();
             }
@@ -352,7 +352,7 @@ public class KGrammarNew implements Opcodes
         factory.addProduction(B, new Symbol[] { S }, c -> new StmtNode(new Token("Block"), c[0]) {
             @Override public void write(MethodWriter writer) {
                 for (AST c : getChildren()) {
-                    if (writer.hasReturned(SymbolTable.ScopeType.FUNCTION)) throw new RuntimeException("unreachable code!");
+                    if (writer.hasReturned()) throw new RuntimeException("unreachable code!");
                     ((StmtNode) c).write(writer);
                 }
             }

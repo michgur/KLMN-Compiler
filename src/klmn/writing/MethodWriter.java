@@ -43,7 +43,7 @@ public class MethodWriter implements Opcodes
         code.chop(size);
     }
 
-    public boolean hasReturned(SymbolTable.ScopeType type) { return st.hasRet(type); }
+    public boolean hasReturned() { return st.hasRet(); }
 
     public void pushNull() { code.push(ACONST_NULL, null); }
     public void pushString(String value) { code.push(LDC, (byte) constPool.addString(value), "Ljava/lang/String;"); }

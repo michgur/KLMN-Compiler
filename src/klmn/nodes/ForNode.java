@@ -24,7 +24,7 @@ public class ForNode extends StmtNode
         writer.setInCond(false);
         writer.enterScope();
         ((StmtNode) getChild(3)).write(writer);
-        if (!writer.hasReturned(SymbolTable.ScopeType.BLOCK))  {
+        if (!writer.hasReturned())  {
             writer.exitScope();
             ((StmtExpNode) getChild(2)).writeStmt(writer);
             writer.useJmpOperator(GOTO, loop);

@@ -39,14 +39,12 @@ public class SymbolTable
     { st.push(new Scope((type == ScopeType.FUNCTION || st.isEmpty()) ? 0 : st.peek().index, type)); }
     public int exitScope() { return st.pop().getKey().size(); }
 
+    public ScopeType getScopeType() { return st.peek().getValue(); }
+
     public enum ScopeType { MODULE, CLASS, FUNCTION, BLOCK }
 
     public void ret() { st.peek().ret = true; }
-    public boolean hasRet(ScopeType type) {
-        for (Scope s : st)
-            if (s.getValue() == type) return s.ret;
-        return false;
-    }
+    public boolean hasRet() { return st.peek().ret; }
 
     private static class Scope extends Pair<Map<String, Pair<Integer, Type>>, ScopeType> {
         private int index;
