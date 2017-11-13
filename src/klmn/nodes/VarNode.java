@@ -3,6 +3,7 @@ package klmn.nodes;
 import ast.AST;
 import jvm.Opcodes;
 import jvm.classes.FieldInfo;
+import klmn.TypeException;
 import klmn.writing.MethodWriter;
 import klmn.writing.ModuleWriter;
 import klmn.writing.SymbolTable;
@@ -12,6 +13,8 @@ import lang.Token;
 public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
 {
     private boolean init, constant = false;
+    private TypeEnv.Type type;
+
     public VarNode(Token name, AST modifiers, AST type) { this(name, false, modifiers, type); }
     public VarNode(Token name, AST modifiers, AST type, AST value) { this(name, true, modifiers, type, value); }
     private VarNode(Token name, boolean init, AST... c) {
@@ -55,12 +58,16 @@ public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
     public void write(MethodWriter writer) {
         String name = getValue().getValue();
         TypeEnv.Type type = ((TypeNode) getChild(1)).get(writer);
+        typeCheck(writer);
 
         writer.getSymbolTable().addSymbol(name, type);
-        if (init) {
-            ((ExpNode) getChild(2)).write(writer);
-            writer.popToLocal(name);
+        if (init) ((ExpNode) getChild(2)).write(writer);
+        else switch (type.getDescriptor()) {
+            case "I": writer.pushInt(0); break;
+            case "F": writer.pushFloat(0); break;
+            default: writer.pushNull();
         }
+        writer.popToLocal(name);
 
         for (AST m : getChild(0).getChildren())
             switch (m.getValue().getValue()) {
@@ -68,10 +75,17 @@ public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
                 case "static":
                 case "public":
                 case "private":
-                    throw new RuntimeException("invalid modifier'" + m.getValue().getValue() + "'for local variable");
+                    throw new RuntimeException("invalid modifier '" + m.getValue().getValue() + "' for local variable");
             }
     }
 
     @Override
     public TypeEnv.Type getType(ModuleWriter writer) { return ((TypeNode) getChild(1)).get(writer); }
+
+    // fixme currently only works for local vars since MethodWriters & ModuleWriters don't have common parent
+    private void typeCheck(MethodWriter writer) {
+        if (getChildren().size() < 3) return;
+        if (!((TypeNode) getChild(1)).get(writer).equals(((ExpNode) getChild(2)).getType(writer)))
+            throw new TypeException();
+    }
 }

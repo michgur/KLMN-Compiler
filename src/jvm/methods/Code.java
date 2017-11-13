@@ -86,6 +86,7 @@ public class Code extends AttributeInfo implements Opcodes
         code.addByte(opcode);
     }
 
+    private Map<Frame, Frame> jmps = new HashMap<>();
     public void jmpOperator(byte opcode, int operands, Frame target) {
         if (operands > 0) smt.pop(operands);
         Frame here = assignFrame(new Frame(), false);
@@ -93,6 +94,7 @@ public class Code extends AttributeInfo implements Opcodes
         frames.putIfAbsent(target, new ArrayList<>());
         frames.get(target).add(Pair.of(code.size(), here));
         code.addShort(0x0000);
+        jmps.put(here, target);
     }
 
     public void chop(int amt) { smt.chop(amt); }
@@ -112,6 +114,7 @@ public class Code extends AttributeInfo implements Opcodes
     @Override
     public ByteList toByteList() {
         if (smt.getSize() != 0) attributes.add(smt);
+
         for (Frame frame : frames.keySet())
             for (Pair<Integer, Frame> pair : frames.get(frame)) {
                 if (pair.getValue() == null ||

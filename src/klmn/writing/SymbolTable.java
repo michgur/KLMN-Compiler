@@ -41,8 +41,16 @@ public class SymbolTable
 
     public enum ScopeType { MODULE, CLASS, FUNCTION, BLOCK }
 
+    public void ret() { st.peek().ret = true; }
+    public boolean hasRet(ScopeType type) {
+        for (Scope s : st)
+            if (s.getValue() == type) return s.ret;
+        return false;
+    }
+
     private static class Scope extends Pair<Map<String, Pair<Integer, Type>>, ScopeType> {
         private int index;
+        private boolean ret = false;
         private Scope(int index, ScopeType type) {
             super(new HashMap<>(), type);
             this.index = index;

@@ -14,12 +14,8 @@ public class KGrammarNew implements Opcodes
 {
     // TEMPORARY
     // MAIN TODOS:
-    //  TODO: StmtExp class
-    //  TODO: proper way to pass Writers to Nodes (multiple passes)
+    //  TODO: raise error for inaccessible code
     //  TODO: manage types properly, store var&func types in symbolTable and keep type conversions somewhere
-    //  TODO: information like symbolTable can't be per method (they share info & require external info), but per program
-    //  TODO: suffer and wither away
-    //  TODO: make hell a bit less unbearable (maybe use files n' shit)
 
     /*
     *   Module:
@@ -101,8 +97,8 @@ public class KGrammarNew implements Opcodes
         VD.addProduction(T, id);
         VD.addProduction(T, A);
 
-        FD.addProduction(MF, T, id, openRound, PD, closeRound, S);
-        FD.addProduction(T, id, openRound, PD, closeRound, S);
+        FD.addProduction(MF, T, id, openRound, PD, closeRound, openCurly, B, closeCurly);
+        FD.addProduction(T, id, openRound, PD, closeRound, openCurly, B, closeCurly);
 
         Symbol PD0 = new Symbol("ParamsDecl0");
         PD0.addProduction(T, id);
@@ -215,10 +211,10 @@ public class KGrammarNew implements Opcodes
         factory.addProduction(VD, new Symbol[] { T, A }, c ->
                 new VarNode(c[1].getChild(0).getValue(), new AST(new Token("Modifiers")), c[0], c[1].getChild(1)));
 
-        factory.addProduction(FD, new Symbol[] { MF, T, id, openRound, PD, closeRound, S },
-                c -> new MethodNode(c[2].getValue(), c[0], c[1], c[4], c[6]));
-        factory.addProduction(FD, new Symbol[] { T, id, openRound, PD, closeRound, S },
-                c -> new MethodNode(c[2].getValue(), new AST(new Token("Modifiers")), c[0], c[3], c[5]));
+        factory.addProduction(FD, new Symbol[] { MF, T, id, openRound, PD, closeRound, openCurly, B, closeCurly },
+                c -> new MethodNode(c[2].getValue(), c[0], c[1], c[4], c[7]));
+        factory.addProduction(FD, new Symbol[] { T, id, openRound, PD, closeRound, openCurly, B, closeCurly },
+                c -> new MethodNode(c[2].getValue(), new AST(new Token("Modifiers")), c[0], c[3], c[6]));
 
         factory.addProduction(PD0, new Symbol[] { T, id }, c -> new AST(new Token("Params"), new AST(c[1].getValue(), c[0])));
         factory.addProduction(PD0, new Symbol[] { PD0, comma, T, id}, c -> {
@@ -240,7 +236,6 @@ public class KGrammarNew implements Opcodes
 
         factory.addProduction(T, new Symbol[] { id }, c -> new TypeNode(c[0].getValue())); // todo: create TypeNode
 
-        // TODO: add as E (=Expression) (create StmtExpNode class)
         factory.addProduction(A, new Symbol[] { id, assign, E }, c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
             @Override protected Type typeCheck(MethodWriter writer) {
                 if (getExpChild(1).getType(writer) != getExpChild(0).getType(writer)) throw new TypeException();

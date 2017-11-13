@@ -6,6 +6,7 @@ import jvm.classes.ClassFile;
 import jvm.methods.MethodInfo;
 import klmn.writing.MethodWriter;
 import klmn.writing.ModuleWriter;
+import klmn.writing.SymbolTable;
 import klmn.writing.TypeEnv;
 import lang.Token;
 
@@ -44,8 +45,11 @@ public class MethodNode extends AST implements ModuleNode.BodyNode, Opcodes
         MethodWriter mw = new MethodWriter(moduleName, writer, true, cf.getConstPool(),
                 new MethodInfo(cf, getValue().getValue(), acc, type, params), pNames);
         ((StmtNode) getChild(3)).write(mw);
+        if (!mw.hasReturned(SymbolTable.ScopeType.FUNCTION)) {
+            if (type.equals("V")) mw.ret();
+            else throw new RuntimeException("no return");
+        }
         writer.getSymbolTable().exitScope();
-//        mw.ret();
     }
 
     @Override

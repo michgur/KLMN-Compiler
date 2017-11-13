@@ -16,7 +16,7 @@ public class MethodWriter implements Opcodes
     private TypeEnv tm = new TypeEnv();
     // vars for writing conditions
     private Frame condEnd;
-    private boolean inCond, skipFor;
+    private boolean inCond = false, skipFor = false, returned = false;
 
     private String parentName;
 
@@ -37,40 +37,49 @@ public class MethodWriter implements Opcodes
     public TypeEnv.Type typeOf(String symbol) { return st.typeOf(symbol); }
     public boolean checkScope(String symbol) { return st.checkScope(symbol); }
 
-    public void enterScope() { st.enterScope(SymbolTable.ScopeType.BLOCK); }
+    public void enterScope() { enterScope(SymbolTable.ScopeType.BLOCK); }
+    public void enterScope(SymbolTable.ScopeType type) { st.enterScope(type); }
     public void exitScope() {
         int size = st.exitScope();
         code.chop(size);
     }
 
-    public void pushString(String value) { code.push(LDC, (byte) constPool.addString(value), "Ljava/lang/String;"); }
+    public boolean hasReturned(SymbolTable.ScopeType type) { return st.hasRet(type); }
+
+    public void pushNull() { accCheck(); code.push(ACONST_NULL, null); }
+    public void pushString(String value) { accCheck(); code.push(LDC, (byte) constPool.addString(value), "Ljava/lang/String;"); }
     public void pushInt(int value) {
+        accCheck();
         if (value <= 5 && value >= -1) code.push((byte) (ICONST_M1 + value + 1), "I");
         else code.push(LDC, (byte) constPool.addInteger(value), "I");
     }
     public void pushFloat(float f) {
+        accCheck();
         if (f == 0) code.push(FCONST_0, "F");
         else if (f == 1) code.push(FCONST_1, "F");
         else if (f == 2) code.push(FCONST_2, "F");
         else code.push(LDC, (byte) constPool.addFloat(f), "F");
     }
     public void pushField(String cls, String field, String type)
-    { code.push(GETFIELD, constPool.addFieldref(cls, field, type), type); }
+    { accCheck(); code.push(GETFIELD, constPool.addFieldref(cls, field, type), type); }
     public void pushStaticField(String cls, String field, String type) // TODO: convert to JVM types by yourself
-    { code.push(GETSTATIC, constPool.addFieldref(cls, field, type), type); }
+    { accCheck(); code.push(GETSTATIC, constPool.addFieldref(cls, field, type), type); }
     public void popToField(String cls, String field, String type)
-    { code.pop(PUTFIELD, constPool.addFieldref(cls, field, type)); }
+    { accCheck(); code.pop(PUTFIELD, constPool.addFieldref(cls, field, type)); }
     public void popToStaticField(String cls, String field, String type)
-    { code.pop(PUTSTATIC, constPool.addFieldref(cls, field, type)); }
+    { accCheck(); code.pop(PUTSTATIC, constPool.addFieldref(cls, field, type)); }
     public void call(String cls, String method, String type, String... params) {
+        accCheck();
         code.invoke(INVOKEVIRTUAL, constPool.addMethodref(cls, method,
             '(' + String.join("", params) + ')' + type), type, params.length, false);
     }
     public void callStatic(String cls, String method, String type, String... params) {
+        accCheck();
         code.invoke(INVOKESTATIC, constPool.addMethodref(cls, method,
                 '(' + String.join("", params) + ')' + type), type, params.length, true);
     }
     public void pushLocal(String name) {
+        accCheck();
         int index = st.findSymbol(name);
         switch (st.scopeTypeOf(name)) {
             case FUNCTION:
@@ -90,8 +99,9 @@ public class MethodWriter implements Opcodes
                 pushStaticField(parentName, name, type); // todo: something nicer and more object-oriented (variable class and shit like that)
         }
     }
-    public void pop() { code.pop(POP); }
+    public void pop() { accCheck(); code.pop(POP); }
     public void popToLocal(String name) {
+        accCheck();
         int i = findSymbol(name);
         switch (code.getStackHeadType()) {
             case "I":
@@ -104,11 +114,13 @@ public class MethodWriter implements Opcodes
                 break;
         }
     }
-    public void useOperator(byte opcode) { code.operator(opcode, getOperandsAmount(opcode), Opcodes.getType(opcode)); }
+    public void useOperator(byte opcode) { accCheck(); code.operator(opcode, getOperandsAmount(opcode), Opcodes.getType(opcode)); }
     public void useJmpOperator(byte opcode, Frame target)
-    { code.jmpOperator(opcode, getOperandsAmount(opcode), target); }
+    { accCheck(); code.jmpOperator(opcode, getOperandsAmount(opcode), target); }
 
     public void ret() {
+        accCheck();
+        st.ret();
         String type = code.getStackHeadType();
         if (type == null) code.retOperator(RETURN, true);
         else switch (type) {
@@ -119,6 +131,8 @@ public class MethodWriter implements Opcodes
             // todo: more types
         }
     }
+
+    private void accCheck() { if (st.hasRet(SymbolTable.ScopeType.FUNCTION)) throw new RuntimeException("unreachable code!"); }
 
     public Frame assignFrame(Frame frame) { return code.assignFrame(frame); }
 

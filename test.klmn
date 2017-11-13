@@ -1,19 +1,27 @@
-# fixme: currently, you have to write return;, even if void
-
-private final float poo = 2.0;
-public float getPoo(float a) { return a + poo; }
-private float poo2 = poo + 2.0;
-
 public float max(float a, float b) {
-    if (a > b) return a;
-    return b;
+    #if (a > b) return a;
+    #if (b >= a) return b;
+    for (float i = 0.0; i < 5.0; i++) if (i == 4.0) return i;
+    return a;
+    #return a;
 }
 
 # until I implement type checking properly, only use floats (vars & literals)
 public void main(shit args) {
-    float i;
-    for (i = 0.0; i < 5.0; i++)
-        print i;
-    print max(i, getPoo(4.0));
-    return;
+    print max(1.0, 2.0);
 }
+
+# (int, int) a = (1, 2), b, c = (3, 4) # a -> (1, 2), b -> null, c -> (3, 4)
+# (int, int) a, b = (1, 2) # a -> null, b -> (1, 2)
+# (int, int) (a, b) = (1, 2) # a:int -> 1, b:int -> 2
+# don't do anything too complicated with these (no generic tuples or anything)
+#   a. not the intention, these are just here to replace structs
+#   b. will create unclear syntax
+#   c. will be more difficult to implement & less efficient overall
+#
+#
+# official syntax:
+# type id[ = value][, id[ = value]...] ;
+# WHERE type can be: type name, array, or tuple (maybe generics in the future)
+#       id can be:   name, multiple names surrounded with parentheses
+#       value can be: expression, multiple expressions surrounded with parentheses
