@@ -6,6 +6,7 @@ import jvm.Opcodes;
 import jvm.methods.Frame;
 import klmn.nodes.*;
 import klmn.writing.MethodWriter;
+import klmn.writing.SymbolTable;
 import lang.*;
 
 import static klmn.writing.TypeEnv.Type;
@@ -328,7 +329,11 @@ public class KGrammarNew implements Opcodes
             @Override public void write(MethodWriter writer) {
                 writer.enterScope();
                 ((StmtNode) c[1]).write(writer);
-                writer.exitScope();
+                if (writer.hasReturned(SymbolTable.ScopeType.BLOCK)) {
+                    writer.exitScope();
+                    writer.ret();
+                }
+                else writer.exitScope();
             }
         });
         factory.addProduction(S, new Symbol[] { kwReturn, semicolon }, c -> new StmtNode(c[0].getValue()) {
@@ -345,7 +350,12 @@ public class KGrammarNew implements Opcodes
             @Override public void write(MethodWriter writer) {}
         });
         factory.addProduction(B, new Symbol[] { S }, c -> new StmtNode(new Token("Block"), c[0]) {
-            @Override public void write(MethodWriter writer) { for (AST c : getChildren()) ((StmtNode) c).write(writer); }
+            @Override public void write(MethodWriter writer) {
+                for (AST c : getChildren()) {
+                    if (writer.hasReturned(SymbolTable.ScopeType.FUNCTION)) throw new RuntimeException("unreachable code!");
+                    ((StmtNode) c).write(writer);
+                }
+            }
         });
         factory.addProduction(B, new Symbol[] { B, S }, c -> {
             c[0].addChild(c[1]);
@@ -770,7 +780,10 @@ public class KGrammarNew implements Opcodes
                             value.append('.');
                         }
                         else if (Character.isDigit(c)) value.append(c);
-                        else break;
+                        else {
+                            if (c == 'f') value.append(c);
+                            break;
+                        }
                     }
                     return value.toString();
                 })
