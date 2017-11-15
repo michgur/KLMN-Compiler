@@ -3,12 +3,16 @@ public float max(float a, float b) {
     return b;
 }
 
-# until I implement type checking properly, only use floats (vars & literals)
+public void pooPrint() { print poo; }
+
+float poo = 1.0;
 public void main(shit args) {
-    for (float i = 0f; i < 50000f; i++) {
-        if (i == max(i, 3f)) return;
-        print i;
-    }
+    float f = 1 * 1f;
+    float poo = 2;
+    int poo2 = 2f;
+    print;
+    print poo, poo2,;
+    pooPrint();
 }
 
 #

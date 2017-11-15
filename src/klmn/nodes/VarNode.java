@@ -6,7 +6,6 @@ import jvm.classes.FieldInfo;
 import klmn.TypeException;
 import klmn.writing.MethodWriter;
 import klmn.writing.ModuleWriter;
-import klmn.writing.SymbolTable;
 import klmn.writing.TypeEnv;
 import lang.Token;
 
@@ -58,16 +57,16 @@ public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
     public void write(MethodWriter writer) {
         String name = getValue().getValue();
         TypeEnv.Type type = ((TypeNode) getChild(1)).get(writer);
-        typeCheck(writer);
 
         writer.getSymbolTable().addSymbol(name, type);
-        if (init) ((ExpNode) getChild(2)).write(writer);
-        else switch (type.getDescriptor()) {
-            case "I": writer.pushInt(0); break;
-            case "F": writer.pushFloat(0); break;
-            default: writer.pushNull();
+        if (init) writer.getTypeEnv().opAssign(writer, new AST(new Token(name)), (ExpNode) getChild(2));
+        else {
+            switch (type.getDescriptor()) {
+                case "I": writer.pushInt(0); break;
+                case "F": writer.pushFloat(0); break;
+                default: writer.pushNull();
+            } writer.popToVar(name);
         }
-        writer.popToLocal(name);
 
         for (AST m : getChild(0).getChildren())
             switch (m.getValue().getValue()) {
@@ -81,11 +80,4 @@ public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
 
     @Override
     public TypeEnv.Type getType(ModuleWriter writer) { return ((TypeNode) getChild(1)).get(writer); }
-
-    // fixme currently only works for local vars since MethodWriters & ModuleWriters don't have common parent
-    private void typeCheck(MethodWriter writer) {
-        if (getChildren().size() < 3) return;
-        if (!((TypeNode) getChild(1)).get(writer).equals(((ExpNode) getChild(2)).getType(writer)))
-            throw new TypeException();
-    }
 }

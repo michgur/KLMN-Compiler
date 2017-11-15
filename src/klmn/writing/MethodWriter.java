@@ -5,6 +5,7 @@ import jvm.classes.ConstPool;
 import jvm.methods.Code;
 import jvm.methods.Frame;
 import jvm.methods.MethodInfo;
+import klmn.nodes.ExpNode;
 
 public class MethodWriter implements Opcodes
 {
@@ -75,7 +76,7 @@ public class MethodWriter implements Opcodes
         code.invoke(INVOKESTATIC, constPool.addMethodref(cls, method,
                 '(' + String.join("", params) + ')' + type), type, params.length, true);
     }
-    public void pushLocal(String name) {
+    public void pushVar(String name) {
         int index = st.findSymbol(name);
         switch (st.scopeTypeOf(name)) {
             case FUNCTION:
@@ -89,6 +90,9 @@ public class MethodWriter implements Opcodes
                         if (index <= 3) code.push((byte) (FLOAD_0 + index), "F");
                         else code.push(FLOAD, (byte) index, "F");
                         break;
+                    default:
+                        if (index <= 3) code.push((byte) (ALOAD_0 + index), code.getType(index));
+                        else code.push(ALOAD, (byte) index, code.getType(index));
                 } break;
             case MODULE: // field of same module
                 String type = st.typeOf(name).getDescriptor();
@@ -96,17 +100,26 @@ public class MethodWriter implements Opcodes
         }
     }
     public void pop() { code.pop(POP); }
-    public void popToLocal(String name) {
+    public void popToVar(String name) {
         int i = findSymbol(name);
-        switch (code.getStackHeadType()) {
-            case "I":
-                if (i <= 3) code.pop((byte) (ISTORE_0 + i), (byte) i, false);
-                else code.pop(ISTORE, (byte) i, true);
-                break;
-            case "F":
-                if (i <= 3) code.pop((byte) (FSTORE_0 + i), (byte) i, false);
-                else code.pop(FSTORE, (byte) i, true);
-                break;
+        switch (st.scopeTypeOf(name)) {
+            case FUNCTION:
+            case BLOCK:
+                switch (code.getStackHeadType()) {
+                    case "I":
+                        if (i <= 3) code.pop((byte) (ISTORE_0 + i), (byte) i, false);
+                        else code.pop(ISTORE, (byte) i, true);
+                        break;
+                    case "F":
+                        if (i <= 3) code.pop((byte) (FSTORE_0 + i), (byte) i, false);
+                        else code.pop(FSTORE, (byte) i, true);
+                        break;
+                    default:
+                        if (i <= 3) code.pop((byte) (ASTORE_0 + i), (byte) i, false);
+                        else code.pop(ASTORE, (byte) i, true);
+                } break;
+            case MODULE:
+                popToStaticField(parentName, name, st.typeOf(name).getDescriptor());
         }
     }
     public void useOperator(byte opcode) { code.operator(opcode, getOperandsAmount(opcode), Opcodes.getType(opcode)); }

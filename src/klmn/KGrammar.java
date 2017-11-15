@@ -4,9 +4,6 @@ import lang.*;
 
 public interface KGrammar
 {
-    Tokenizer TOKENIZER = new Tokenizer();
-    Grammar GRAMMAR = init();
-    
     Symbol M = new Symbol("Module");
     Symbol VD = new Symbol("VarDecl");
     Symbol FD = new Symbol("FuncDecl");
@@ -68,6 +65,9 @@ public interface KGrammar
     Terminal decrement = new Terminal("--");
     Terminal kwTrue = new Terminal("true");
     Terminal kwFalse = new Terminal("false");
+
+    Tokenizer TOKENIZER = new Tokenizer();
+    Grammar GRAMMAR = init();
     
     private static Grammar init() {
         M.addProduction();
@@ -105,7 +105,9 @@ public interface KGrammar
 
         S.addProduction(SE, semicolon);
         S.addProduction(VD, semicolon);
-        S.addProduction(kwPrint, E, semicolon);
+        S.addProduction(kwPrint, semicolon);
+        S.addProduction(kwPrint, P, semicolon);
+        S.addProduction(kwPrint, P, comma, semicolon);
         S.addProduction(kwIf, openRound, E, closeRound, S);
         S.addProduction(kwIf, openRound, E, closeRound, S, kwElse, S);
 

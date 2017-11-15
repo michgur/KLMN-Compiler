@@ -216,7 +216,8 @@ public interface Opcodes
             FADD, FSUB, FDIV, FMUL, DADD, DSUB, DDIV, DMUL, LADD, LSUB, LDIV, LMUL, IREM, FREM, DREM, LREM,
             FCMPG, FCMPL, DCMPG, DCMPL, LCMP
     )), unaryOperators = new HashSet<>(Arrays.asList(
-            INEG, FNEG, DNEG, LNEG, IFEQ, IFNE, IFLT, IFLE, IFGT, IFGE
+            INEG, FNEG, DNEG, LNEG, IFEQ, IFNE, IFLT, IFLE, IFGT, IFGE,
+            I2F, I2B, I2C, I2D, I2L, I2S, F2I, F2D, F2L
     )), jmpOperators = new HashSet<>(Arrays.asList(
             IF_ICMPEQ, IF_ICMPNE, IF_ICMPLT, IF_ICMPLE, IF_ICMPGT, IF_ICMPGE, IF_ACMPEQ, IF_ACMPNE,
             GOTO, GOTO_W, IFEQ, IFNE, IFLT, IFLE, IFGT, IFGE
