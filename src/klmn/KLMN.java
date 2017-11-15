@@ -160,6 +160,8 @@ public class KLMN implements Opcodes, KGrammar
             @Override public void write(MethodWriter writer) {
                 for (int i = 0; i < getChild(0).getChildren().size() - 1; i++) {
                     AST p = getChild(0).getChildren().get(i);
+                    if (((ExpNode) p).getType(writer).getDescriptor().equals("V"))
+                        throw new RuntimeException("cannot print void!");
                     writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
                     ((ExpNode) p).write(writer);
                     writer.call("java/io/PrintStream", "print", "V",
@@ -169,6 +171,8 @@ public class KLMN implements Opcodes, KGrammar
                     writer.call("java/io/PrintStream", "print", "V", "Ljava/lang/String;");
                 }
                 AST p = getChild(0).getChildren().get(getChild(0).getChildren().size() - 1);
+                if (((ExpNode) p).getType(writer).getDescriptor().equals("V"))
+                    throw new RuntimeException("cannot print void!");
                 writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
                 ((ExpNode) p).write(writer);
                 writer.call("java/io/PrintStream", "println", "V",
@@ -177,8 +181,9 @@ public class KLMN implements Opcodes, KGrammar
         });
         factory.addProduction(S, new Symbol[] { kwPrint, P, comma, semicolon }, c -> new StmtNode(c[0].getValue(), c[1]) {
             @Override public void write(MethodWriter writer) {
-                for (int i = 0; i < getChild(0).getChildren().size() - 1; i++) {
-                    AST p = getChild(0).getChildren().get(i);
+                getChild(0).getChildren().forEach(p -> {
+                    if (((ExpNode) p).getType(writer).getDescriptor().equals("V"))
+                        throw new RuntimeException("cannot print void!");
                     writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
                     ((ExpNode) p).write(writer);
                     writer.call("java/io/PrintStream", "print", "V",
@@ -186,12 +191,7 @@ public class KLMN implements Opcodes, KGrammar
                     writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
                     writer.pushString(" ");
                     writer.call("java/io/PrintStream", "print", "V", "Ljava/lang/String;");
-                }
-                AST p = getChild(0).getChildren().get(getChild(0).getChildren().size() - 1);
-                writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
-                ((ExpNode) p).write(writer);
-                writer.call("java/io/PrintStream", "print", "V",
-                        ((ExpNode) p).getType(writer).getDescriptor());
+                });
             }
         });
         factory.addProduction(S, new Symbol[] { kwIf, openRound, E, closeRound, S }, c -> new IfNode(c[0].getValue(), c[2], c[4]));

@@ -5,7 +5,7 @@ public float max(float a, float b) {
 
 public void pooPrint() { print poo; }
 
-float poo = 1.0;
+int poo = 1.0;
 public void main(shit args) {
     float f = 1 * 1f;
     float poo = 2;

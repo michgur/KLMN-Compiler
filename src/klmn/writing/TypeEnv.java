@@ -34,7 +34,7 @@ public class TypeEnv implements Opcodes
         add("long", "J");
         Type f = add("float", "F");
         add("double", "D");
-        add("string", "Ljava/lang/String;");
+        Type s = add("string", "Ljava/lang/String;");
         add("boolean", "Z");
         add("shit", "[Ljava/lang/String;");
         add("void", "V");
@@ -45,6 +45,7 @@ public class TypeEnv implements Opcodes
         divOps = new HashMap<>();
         assignOps = new HashMap<>();
 
+        // addition for strings appears to be more complicated
         putOpAdd(i, i, new OpSame(IADD), i);
         putOpAdd(f, f, new OpSame(FADD), f);
         putOpAdd(i, f, new OpIF(FADD), f);
@@ -104,12 +105,15 @@ public class TypeEnv implements Opcodes
         } else writer.pushInt((int) Float.parseFloat(f.getValue().getValue()));
     }
 
+    // todo: eq, ne, lt, gt, le, ge
+    // and then todo: and, or, not, etc..
     private Map<Pair<Type, Type>, Pair<BinaryOperator, Type>> addOps, subOps, mulOps, divOps;
     private Map<Pair<Type, Type>, AssignOperator> assignOps;
 
     public interface AssignOperator { void op(MethodWriter writer, AST a, ExpNode b); }
     public interface BinaryOperator { void op(MethodWriter writer, ExpNode a, ExpNode b); }
     // todo: something scope-based (for op overloading)
+    // todo: exception for undefined operators
     public void putOpAdd(Type a, Type b, BinaryOperator op, Type res) { addOps.put(Pair.of(a, b), Pair.of(op, res)); }
     public void putOpSub(Type a, Type b, BinaryOperator op, Type res) { subOps.put(Pair.of(a, b), Pair.of(op, res)); }
     public void putOpMul(Type a, Type b, BinaryOperator op, Type res) { mulOps.put(Pair.of(a, b), Pair.of(op, res)); }

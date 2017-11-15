@@ -30,8 +30,7 @@ public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
 
         if (init) {
             MethodWriter initializer = writer.getModule().getInitializer();
-            ((ExpNode) getChild(2)).write(initializer);
-            initializer.popToStaticField(writer.getModule().getValue().getValue(), name, type);
+            initializer.getTypeEnv().opAssign(initializer, new AST(new Token(name)), (ExpNode) getChild(2));
         }
 
         int acc = ACC_STATIC;
