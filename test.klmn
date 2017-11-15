@@ -5,12 +5,14 @@ public float max(float a, float b) {
 
 public void pooPrint() { print poo; }
 
-int poo = 1.0;
-public void main(shit args) {
+int poo = 1f;
+string bananas = "bananas " + "in pajamas";
+string b = bananas;
+public void main(stringArr args) {
     float f = 1 * 1f;
     float poo = 2;
     int poo2 = 2f;
-    print;
+    print "hello, " + poo + ", how r u?";
     print poo, poo2,;
     pooPrint();
 }

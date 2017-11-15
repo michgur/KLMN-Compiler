@@ -14,7 +14,8 @@ public class SymbolTable
     private Deque<Scope> st = new ArrayDeque<>();
 
     public void addSymbol(String symbol, Type type) {
-        if (st.peek().getKey().containsKey(symbol)) throw new RuntimeException("symbol " + symbol + " already defined!");
+        if (st.peek().getKey().containsKey(symbol))
+            throw new RuntimeException("symbol " + symbol + " already defined!");
         st.peek().getKey().put(symbol, Pair.of(st.peek().index++, type));
     }
     public int findSymbol(String symbol) {

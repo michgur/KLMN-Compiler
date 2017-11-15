@@ -151,47 +151,18 @@ public class KLMN implements Opcodes, KGrammar
         });
         factory.addProduction(S, new Symbol[] { VD, semicolon }, c -> c[0]);
         factory.addProduction(S, new Symbol[] { kwPrint, semicolon }, c -> new StmtNode(c[0].getValue()) {
-            @Override public void write(MethodWriter writer) {
-                writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
-                writer.call("java/io/PrintStream", "println", "V");
-            }
+            @Override public void write(MethodWriter writer) { writer.println(); }
         });
         factory.addProduction(S, new Symbol[] { kwPrint, P, semicolon }, c -> new StmtNode(c[0].getValue(), c[1]) {
             @Override public void write(MethodWriter writer) {
-                for (int i = 0; i < getChild(0).getChildren().size() - 1; i++) {
-                    AST p = getChild(0).getChildren().get(i);
-                    if (((ExpNode) p).getType(writer).getDescriptor().equals("V"))
-                        throw new RuntimeException("cannot print void!");
-                    writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
-                    ((ExpNode) p).write(writer);
-                    writer.call("java/io/PrintStream", "print", "V",
-                            ((ExpNode) p).getType(writer).getDescriptor());
-                    writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
-                    writer.pushString(" ");
-                    writer.call("java/io/PrintStream", "print", "V", "Ljava/lang/String;");
-                }
-                AST p = getChild(0).getChildren().get(getChild(0).getChildren().size() - 1);
-                if (((ExpNode) p).getType(writer).getDescriptor().equals("V"))
-                    throw new RuntimeException("cannot print void!");
-                writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
-                ((ExpNode) p).write(writer);
-                writer.call("java/io/PrintStream", "println", "V",
-                        ((ExpNode) p).getType(writer).getDescriptor());
+                for (int i = 0; i < getChild(0).getChildren().size() - 1; i++)
+                    writer.print((ExpNode) getChild(0).getChildren().get(i));
+                writer.println((ExpNode) getChild(0).getChildren().get(getChild(0).getChildren().size() - 1));
             }
         });
         factory.addProduction(S, new Symbol[] { kwPrint, P, comma, semicolon }, c -> new StmtNode(c[0].getValue(), c[1]) {
             @Override public void write(MethodWriter writer) {
-                getChild(0).getChildren().forEach(p -> {
-                    if (((ExpNode) p).getType(writer).getDescriptor().equals("V"))
-                        throw new RuntimeException("cannot print void!");
-                    writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
-                    ((ExpNode) p).write(writer);
-                    writer.call("java/io/PrintStream", "print", "V",
-                            ((ExpNode) p).getType(writer).getDescriptor());
-                    writer.pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
-                    writer.pushString(" ");
-                    writer.call("java/io/PrintStream", "print", "V", "Ljava/lang/String;");
-                });
+                getChild(0).getChildren().forEach(p -> writer.print((ExpNode) p));
             }
         });
         factory.addProduction(S, new Symbol[] { kwIf, openRound, E, closeRound, S }, c -> new IfNode(c[0].getValue(), c[2], c[4]));
@@ -470,30 +441,30 @@ public class KLMN implements Opcodes, KGrammar
         factory.addProduction(T3, new Symbol[] { T3, plus, T2 },
                 c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
                     @Override public Type typeCheck(MethodWriter writer)
-                    { return writer.getTypeEnv().opAddType(getExpChild(0).getType(writer), getExpChild(1).getType(writer)); }
+                    { return writer.getTypeEnv().binaryOpType(getValue().getType(), getExpChild(0).getType(writer), getExpChild(1).getType(writer)); }
                     @Override public void write(MethodWriter writer)
-                    { writer.getTypeEnv().opAdd(writer, getExpChild(0), getExpChild(1)); }
+                    { writer.getTypeEnv().binaryOp(writer, getValue().getType(), getExpChild(0), getExpChild(1)); }
                 });
         factory.addProduction(T3, new Symbol[] { T3, minus, T2 },
                 c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
                     @Override public Type typeCheck(MethodWriter writer)
-                    { return writer.getTypeEnv().opSubType(getExpChild(0).getType(writer), getExpChild(1).getType(writer)); }
+                    { return writer.getTypeEnv().binaryOpType(getValue().getType(), getExpChild(0).getType(writer), getExpChild(1).getType(writer)); }
                     @Override public void write(MethodWriter writer)
-                    { writer.getTypeEnv().opSub(writer, getExpChild(0), getExpChild(1)); }
+                    { writer.getTypeEnv().binaryOp(writer, getValue().getType(), getExpChild(0), getExpChild(1)); }
                 });
         factory.addProduction(T2, new Symbol[] { T2, times, T1 },
                 c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
                     @Override public Type typeCheck(MethodWriter writer)
-                    { return writer.getTypeEnv().opMulType(getExpChild(0).getType(writer), getExpChild(1).getType(writer)); }
+                    { return writer.getTypeEnv().binaryOpType(getValue().getType(), getExpChild(0).getType(writer), getExpChild(1).getType(writer)); }
                     @Override public void write(MethodWriter writer)
-                    { writer.getTypeEnv().opMul(writer, getExpChild(0), getExpChild(1)); }
+                    { writer.getTypeEnv().binaryOp(writer, getValue().getType(), getExpChild(0), getExpChild(1)); }
                 });
         factory.addProduction(T2, new Symbol[] { T2, divide, T1 },
                 c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
                     @Override public Type typeCheck(MethodWriter writer)
-                    { return writer.getTypeEnv().opDivType(getExpChild(0).getType(writer), getExpChild(1).getType(writer)); }
+                    { return writer.getTypeEnv().binaryOpType(getValue().getType(), getExpChild(0).getType(writer), getExpChild(1).getType(writer)); }
                     @Override public void write(MethodWriter writer)
-                    { writer.getTypeEnv().opDiv(writer, getExpChild(0), getExpChild(1)); }
+                    { writer.getTypeEnv().binaryOp(writer, getValue().getType(), getExpChild(0), getExpChild(1)); }
                 });
         factory.addProduction(T2, new Symbol[] { T1 }, c -> c[0]);
         factory.addProduction(T1, new Symbol[] { T0 }, c -> c[0]);
@@ -582,7 +553,7 @@ public class KLMN implements Opcodes, KGrammar
             }
         });
         factory.addProduction(T0, new Symbol[] { stringL }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
-            @Override public Type typeCheck(MethodWriter writer) { return writer.getTypeEnv().getForName("string"); }
+            @Override public Type typeCheck(MethodWriter writer) { return writer.getTypeEnv().getForName("<stringL>"); }
             @Override public void write(MethodWriter writer) { writer.pushString(getValue().getValue().substring(2)); }
         });
         factory.addProduction(T0, new Symbol[] { id }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {

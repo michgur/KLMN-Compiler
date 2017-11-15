@@ -1,11 +1,14 @@
 package klmn.writing;
 
+import ast.AST;
 import jvm.Opcodes;
 import jvm.classes.ConstPool;
 import jvm.methods.Code;
 import jvm.methods.Frame;
 import jvm.methods.MethodInfo;
 import klmn.nodes.ExpNode;
+
+import java.util.List;
 
 public class MethodWriter implements Opcodes
 {
@@ -60,6 +63,15 @@ public class MethodWriter implements Opcodes
         else if (f == 2) code.push(FCONST_2, "F");
         else code.push(LDC, (byte) constPool.addFloat(f), "F");
     }
+    public void pushNew(String cls) {
+        code.push(NEW, constPool.addClass(cls), cls);
+        code.push(DUP, cls);
+    }
+    public void init(String cls, String... params) {
+        code.invoke(INVOKESPECIAL, constPool.addMethodref(cls, "<init>",
+                '(' + String.join("", params) + ")V"), "V", params.length, false);
+    }
+    public void dup() { code.push(DUP, code.getStackHeadType()); }
     public void pushField(String cls, String field, String type)
     { code.push(GETFIELD, constPool.addFieldref(cls, field, type), type); }
     public void pushStaticField(String cls, String field, String type) // TODO: convert to JVM types by yourself
@@ -125,6 +137,44 @@ public class MethodWriter implements Opcodes
     public void useOperator(byte opcode) { code.operator(opcode, getOperandsAmount(opcode), Opcodes.getType(opcode)); }
     public void useJmpOperator(byte opcode, Frame target)
     { code.jmpOperator(opcode, getOperandsAmount(opcode), target); }
+
+    public void print(ExpNode exp) { // todo: use dup for printing without getstatic per print
+        pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
+        exp.write(this);
+        String type = exp.getType(this).getDescriptor();
+        switch (type) {
+            case "V": throw new RuntimeException("cannot print void!");
+            case "I":
+            case "F":
+            case "Ljava/lang/String;":
+                call("java/io/PrintStream", "print", "V", type);
+                break;
+            default:
+                call("java/io/PrintStream", "print", "V", "Ljava/lang/Object;");
+        }
+        pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
+        pushString(" ");
+        call("java/io/PrintStream", "print", "V", "Ljava/lang/String;");
+    }
+    public void println() {
+        pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
+        call("java/io/PrintStream", "print", "V");
+    }
+    public void println(ExpNode exp) {
+        pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
+        exp.write(this);
+        String type = exp.getType(this).getDescriptor();
+        switch (type) {
+            case "V": throw new RuntimeException("cannot print void!");
+            case "I":
+            case "F":
+            case "Ljava/lang/String;":
+                call("java/io/PrintStream", "println", "V", type);
+                break;
+            default:
+                call("java/io/PrintStream", "println", "V", "Ljava/lang/Object;");
+        }
+    }
 
     public void ret() {
         st.ret();

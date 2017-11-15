@@ -3,7 +3,6 @@ package klmn.nodes;
 import ast.AST;
 import jvm.Opcodes;
 import jvm.classes.FieldInfo;
-import klmn.TypeException;
 import klmn.writing.MethodWriter;
 import klmn.writing.ModuleWriter;
 import klmn.writing.TypeEnv;
@@ -28,9 +27,18 @@ public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
         String name = getValue().getValue(),
                 type = ((TypeNode) getChild(1)).get(writer).getDescriptor();
 
-        if (init) {
-            MethodWriter initializer = writer.getModule().getInitializer();
-            initializer.getTypeEnv().opAssign(initializer, new AST(new Token(name)), (ExpNode) getChild(2));
+        MethodWriter initializer = writer.getModule().getInitializer();
+        if (init) initializer.getTypeEnv().assignOp(initializer, new AST(new Token(name)), (ExpNode) getChild(2));
+        else {
+            switch (type) {
+                case "I": initializer.pushInt(0); break;
+                case "F": initializer.pushFloat(0); break;
+                case "Ljava/lang/StringBuilder;":
+                    initializer.pushNew("java/lang/StringBuilder");
+                    initializer.init("java/lang/StringBuilder");
+                    break;
+                default: initializer.pushNull();
+            } initializer.popToVar(name);
         }
 
         int acc = ACC_STATIC;
@@ -58,11 +66,15 @@ public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
         TypeEnv.Type type = ((TypeNode) getChild(1)).get(writer);
 
         writer.getSymbolTable().addSymbol(name, type);
-        if (init) writer.getTypeEnv().opAssign(writer, new AST(new Token(name)), (ExpNode) getChild(2));
+        if (init) writer.getTypeEnv().assignOp(writer, new AST(new Token(name)), (ExpNode) getChild(2));
         else {
             switch (type.getDescriptor()) {
                 case "I": writer.pushInt(0); break;
                 case "F": writer.pushFloat(0); break;
+                case "Ljava/lang/StringBuilder;":
+                    writer.pushNew("java/lang/StringBuilder");
+                    writer.init("java/lang/StringBuilder");
+                    break;
                 default: writer.pushNull();
             } writer.popToVar(name);
         }

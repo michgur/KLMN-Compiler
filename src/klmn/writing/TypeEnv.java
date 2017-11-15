@@ -3,6 +3,7 @@ package klmn.writing;
 import ast.AST;
 import jvm.Opcodes;
 import klmn.nodes.ExpNode;
+import lang.Terminal;
 import util.Pair;
 
 import java.util.*;
@@ -34,42 +35,34 @@ public class TypeEnv implements Opcodes
         add("long", "J");
         Type f = add("float", "F");
         add("double", "D");
-        Type s = add("string", "Ljava/lang/String;");
-        add("boolean", "Z");
-        add("shit", "[Ljava/lang/String;");
+        Type s = add("string", "Ljava/lang/StringBuilder;");
+        Type bool = add("boolean", "Z");
+        add("stringArr", "[Ljava/lang/String;");
         add("void", "V");
+        Type sl = add("<stringL>", "Ljava/lang/String;"); // only for literals
 
-        addOps = new HashMap<>();
-        subOps = new HashMap<>();
-        mulOps = new HashMap<>();
-        divOps = new HashMap<>();
+        binaryOps = new HashMap<>();
         assignOps = new HashMap<>();
 
         // addition for strings appears to be more complicated
-        putOpAdd(i, i, new OpSame(IADD), i);
-        putOpAdd(f, f, new OpSame(FADD), f);
-        putOpAdd(i, f, new OpIF(FADD), f);
-        putOpAdd(f, i, new OpFI(FADD), f);
-        putOpSub(i, i, new OpSame(ISUB), i);
-        putOpSub(f, f, new OpSame(FSUB), f);
-        putOpSub(i, f, new OpIF(FSUB), f);
-        putOpSub(f, i, new OpFI(FSUB), f);
-        putOpMul(i, i, new OpSame(IMUL), i);
-        putOpMul(f, f, new OpSame(FMUL), f);
-        putOpMul(i, f, new OpIF(FMUL), f);
-        putOpMul(f, i, new OpFI(FMUL), f);
-        putOpDiv(i, i, new OpSame(IDIV), i);
-        putOpDiv(f, f, new OpSame(FDIV), f);
-        putOpDiv(i, f, new OpIF(FDIV), f);
-        putOpDiv(f, i, new OpFI(FDIV), f);
-        putOpAssign(i, i, (writer, a, b) -> {
-            b.write(writer);
-            writer.popToVar(a.getValue().getValue());
-        });
-        putOpAssign(f, f, (writer, a, b) -> {
-            b.write(writer);
-            writer.popToVar(a.getValue().getValue());
-        });
+        Terminal add = new Terminal("+"), sub = new Terminal("-"),
+                mul = new Terminal("*"), div = new Terminal("/");
+        putOp(add, i, i, new OpSame(IADD), i);
+        putOp(add, f, f, new OpSame(FADD), f);
+        putOp(add, i, f, new OpIF(FADD), f);
+        putOp(add, f, i, new OpFI(FADD), f);
+        putOp(sub, i, i, new OpSame(ISUB), i);
+        putOp(sub, f, f, new OpSame(FSUB), f);
+        putOp(sub, i, f, new OpIF(FSUB), f);
+        putOp(sub, f, i, new OpFI(FSUB), f);
+        putOp(mul, i, i, new OpSame(IMUL), i);
+        putOp(mul, f, f, new OpSame(FMUL), f);
+        putOp(mul, i, f, new OpIF(FMUL), f);
+        putOp(mul, f, i, new OpFI(FMUL), f);
+        putOp(div, i, i, new OpSame(IDIV), i);
+        putOp(div, f, f, new OpSame(FDIV), f);
+        putOp(div, i, f, new OpIF(FDIV), f);
+        putOp(div, f, i, new OpFI(FDIV), f);
         putOpAssign(i, f, (writer, a, b) -> {
             f2i(writer, b);
             writer.popToVar(a.getValue().getValue());
@@ -78,6 +71,66 @@ public class TypeEnv implements Opcodes
             i2f(writer, b);
             writer.popToVar(a.getValue().getValue());
         });
+        putOpAssign(s, sl, (writer, a, b) -> {
+            createString(writer, b);
+            writer.popToVar(a.getValue().getValue());
+        });
+        putStringOp(s);
+        putStringOp(sl);
+        putStringOp(i);
+        putStringOp(f);
+        putStringOp(bool);
+
+        // slightly better versions
+        putOp(add, sl, s, (writer, a, b) -> {
+            b.write(writer);
+            writer.pushInt(0);
+            a.write(writer);
+            writer.call("java/lang/StringBuilder", "insert", "Ljava/lang/StringBuilder;", "I", "Ljava/lang/String;");
+        }, s);
+        putOp(add, s, sl, (writer, a, b) -> {
+            a.write(writer);
+            b.write(writer);
+            writer.call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", "Ljava/lang/String;");
+        }, s);
+    }
+    private void putStringOp(Type t) {
+        Terminal add = new Terminal("+");
+        Type s = getForName("string"), sl = getForName("<stringL>");
+        String desc = getStringDesc(t);
+        putOp(add, t, sl, (writer, a, b) -> {
+            b.write(writer);
+            writer.pushInt(0);
+            createString(writer, a);
+            writer.call("java/lang/StringBuilder", "insert", "Ljava/lang/StringBuilder;", "I", desc);
+        }, s);
+        putOp(add, sl, t, (writer, a, b) -> {
+            createString(writer, a);
+            b.write(writer);
+            writer.call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", desc);
+        }, s);
+        putOp(add, t, s, (writer, a, b) -> {
+            b.write(writer);
+            writer.pushInt(0);
+            a.write(writer);
+            writer.call("java/lang/StringBuilder", "insert", "Ljava/lang/StringBuilder;", "I", desc);
+        }, s);
+        putOp(add, s, t, (writer, a, b) -> {
+            a.write(writer);
+            b.write(writer);
+            writer.call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", desc);
+        }, s);
+    }
+
+    private static String getStringDesc(Type t) {
+        switch (t.getName()) {
+            case "int":
+            case "float":
+            case "boolean":
+            case "<stringL>":
+                return t.getDescriptor();
+            default: return "Ljava/lang/Object;";
+        }
     }
 
     private static class OpSame implements BinaryOperator{
@@ -104,36 +157,47 @@ public class TypeEnv implements Opcodes
             writer.useOperator(F2I);
         } else writer.pushInt((int) Float.parseFloat(f.getValue().getValue()));
     }
+    private static void createString(MethodWriter writer, ExpNode literal) {
+        writer.pushNew("java/lang/StringBuilder");
+        literal.write(writer);
+        writer.init("java/lang/StringBuilder", "Ljava/lang/String;");
+    }
 
-    // todo: eq, ne, lt, gt, le, ge
-    // and then todo: and, or, not, etc..
-    private Map<Pair<Type, Type>, Pair<BinaryOperator, Type>> addOps, subOps, mulOps, divOps;
+    private Map<Terminal, Map<Pair<Type, Type>, Pair<BinaryOperator, Type>>> binaryOps;
     private Map<Pair<Type, Type>, AssignOperator> assignOps;
 
     public interface AssignOperator { void op(MethodWriter writer, AST a, ExpNode b); }
     public interface BinaryOperator { void op(MethodWriter writer, ExpNode a, ExpNode b); }
     // todo: something scope-based (for op overloading)
     // todo: exception for undefined operators
-    public void putOpAdd(Type a, Type b, BinaryOperator op, Type res) { addOps.put(Pair.of(a, b), Pair.of(op, res)); }
-    public void putOpSub(Type a, Type b, BinaryOperator op, Type res) { subOps.put(Pair.of(a, b), Pair.of(op, res)); }
-    public void putOpMul(Type a, Type b, BinaryOperator op, Type res) { mulOps.put(Pair.of(a, b), Pair.of(op, res)); }
-    public void putOpDiv(Type a, Type b, BinaryOperator op, Type res) { divOps.put(Pair.of(a, b), Pair.of(op, res)); }
+    public void putOp(Terminal op, Type a, Type b, BinaryOperator code, Type res) {
+        binaryOps.putIfAbsent(op, new HashMap<>());
+        binaryOps.get(op).put(Pair.of(a, b), Pair.of(code, res));
+    }
     public void putOpAssign(Type a, Type b, AssignOperator op) { assignOps.put(Pair.of(a, b), op); }
 
-    public void opAdd(MethodWriter writer, ExpNode a, ExpNode b)
-    { addOps.get(Pair.of(a.getType(writer), b.getType(writer))).getKey().op(writer, a, b); }
-    public Type opAddType(Type a, Type b) { return addOps.get(Pair.of(a, b)).getValue(); }
-    public void opSub(MethodWriter writer, ExpNode a, ExpNode b)
-    { subOps.get(Pair.of(a.getType(writer), b.getType(writer))).getKey().op(writer, a, b); }
-    public Type opSubType(Type a, Type b) { return subOps.get(Pair.of(a, b)).getValue(); }
-    public void opMul(MethodWriter writer, ExpNode a, ExpNode b)
-    { mulOps.get(Pair.of(a.getType(writer), b.getType(writer))).getKey().op(writer, a, b); }
-    public Type opMulType(Type a, Type b) { return mulOps.get(Pair.of(a, b)).getValue(); }
-    public void opDiv(MethodWriter writer, ExpNode a, ExpNode b)
-    { divOps.get(Pair.of(a.getType(writer), b.getType(writer))).getKey().op(writer, a, b); }
-    public Type opDivType(Type a, Type b) { return divOps.get(Pair.of(a, b)).getValue(); }
-    public void opAssign(MethodWriter writer, AST a, ExpNode b)
-    { assignOps.get(Pair.of(writer.typeOf(a.getValue().getValue()), b.getType(writer))).op(writer, a, b); }
+    public void binaryOp(MethodWriter writer, Terminal op, ExpNode a, ExpNode b) {
+        Type ta = a.getType(writer), tb = b.getType(writer);
+        BinaryOperator code = binaryOps.get(op).get(Pair.of(ta, tb)).getKey();
+        if (code == null)
+            throw new RuntimeException("no " + op + " operator defined for types " + ta.getName() + ", " + tb.getName());
+        code.op(writer, a, b);
+    }
+    public Type binaryOpType(Terminal op, Type a, Type b) {
+        Type t = binaryOps.get(op).get(Pair.of(a, b)).getValue();
+        if (t == null)
+            throw new RuntimeException("no " + op + " operator defined for types " + a.getName() + ", " + b.getName());
+        return t;
+    }
+    public void assignOp(MethodWriter writer, AST a, ExpNode b) {
+        Type ta = writer.typeOf(a.getValue().getValue()), tb = b.getType(writer);
+        if (assignOps.get(Pair.of(ta, tb)) == null) {
+            if (! ta.equals(tb))
+                throw new RuntimeException("no = operator defined for types " + ta.getName() + ", " + tb.getName());
+            b.write(writer);
+            writer.popToVar(a.getValue().getValue());
+        } else assignOps.get(Pair.of(ta, tb)).op(writer, a, b);
+    }
 
     public static class Type
     {
