@@ -1,7 +1,7 @@
 package klmn.nodes;
 
 import ast.AST;
-import jvm.methods.Frame;
+import jvm.methods.Label;
 import klmn.writing.MethodWriter;
 import klmn.writing.SymbolTable;
 import lang.Token;
@@ -14,10 +14,10 @@ public class ForNode extends StmtNode
 
     @Override
     public void write(MethodWriter writer) {
-        Frame loop = new Frame(), end = new Frame();
+        Label loop = new Label(), end = new Label();
         writer.enterScope(SymbolTable.ScopeType.BLOCK);
         ((StmtNode) getChild(0)).write(writer);
-        writer.assignFrame(loop);
+        writer.assign(loop);
         writer.setCondEnd(end);
         writer.setInCond(true);
         ((ExpNode) getChild(1)).write(writer);
@@ -30,6 +30,6 @@ public class ForNode extends StmtNode
             writer.useJmpOperator(GOTO, loop);
         } else writer.exitScope();
         writer.exitScope();
-        writer.assignFrame(end);
+        writer.assign(end);
     }
 }

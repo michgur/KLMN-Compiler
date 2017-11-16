@@ -1,14 +1,11 @@
 package klmn.writing;
 
-import ast.AST;
 import jvm.Opcodes;
 import jvm.classes.ConstPool;
 import jvm.methods.Code;
-import jvm.methods.Frame;
+import jvm.methods.Label;
 import jvm.methods.MethodInfo;
 import klmn.nodes.ExpNode;
-
-import java.util.List;
 
 public class MethodWriter implements Opcodes
 {
@@ -16,9 +13,9 @@ public class MethodWriter implements Opcodes
     private Code code;
 
     private SymbolTable st;
-    private TypeEnv tm = new TypeEnv();
+    private TypeEnv te;
     // vars for writing conditions
-    private Frame condEnd;
+    private Label condEnd;
     private boolean inCond = false, skipFor = false;
 
     private String parentName;
@@ -28,12 +25,13 @@ public class MethodWriter implements Opcodes
         this.constPool = constPool;
         code = method.getCode();
         st = parent.getSymbolTable();
+        te = parent.getTypeEnv();
         if (newScope) st.enterScope(SymbolTable.ScopeType.FUNCTION);
         String[] paramTypes = method.getParams();
         if (paramNames.length != paramTypes.length)
             throw new RuntimeException("Parameter names array's length doesn't match with method");
         for (int i = 0; i < paramNames.length; i++)
-            st.addSymbol(paramNames[i], tm.getForDescriptor(paramTypes[i]));
+            st.addSymbol(paramNames[i], te.getForDescriptor(paramTypes[i]));
     }
 
     public int findSymbol(String symbol) { return st.findSymbol(symbol); }
@@ -135,7 +133,7 @@ public class MethodWriter implements Opcodes
         }
     }
     public void useOperator(byte opcode) { code.operator(opcode, getOperandsAmount(opcode), Opcodes.getType(opcode)); }
-    public void useJmpOperator(byte opcode, Frame target)
+    public void useJmpOperator(byte opcode, Label target)
     { code.jmpOperator(opcode, getOperandsAmount(opcode), target); }
 
     public void print(ExpNode exp) { // todo: use dup for printing without getstatic per print
@@ -145,6 +143,7 @@ public class MethodWriter implements Opcodes
         switch (type) {
             case "V": throw new RuntimeException("cannot print void!");
             case "I":
+            case "Z":
             case "F":
             case "Ljava/lang/String;":
                 call("java/io/PrintStream", "print", "V", type);
@@ -168,6 +167,7 @@ public class MethodWriter implements Opcodes
             case "V": throw new RuntimeException("cannot print void!");
             case "I":
             case "F":
+            case "Z":
             case "Ljava/lang/String;":
                 call("java/io/PrintStream", "println", "V", type);
                 break;
@@ -189,13 +189,14 @@ public class MethodWriter implements Opcodes
         }
     }
 
-    public Frame assignFrame(Frame frame) { return code.assignFrame(frame); }
+//    public Frame assignFrame(Frame frame) { return code.assignFrame(frame); }
+    public Label assign(Label label) { return code.assign(label); }
 
     private static int getOperandsAmount(byte opcode)
     { return binaryOperators.contains(opcode) ? 2 : unaryOperators.contains(opcode) ? 1 : 0; }
 
-    public Frame getCondEnd() { return condEnd; }
-    public void setCondEnd(Frame condEnd) { this.condEnd = condEnd; }
+    public Label getCondEnd() { return condEnd; }
+    public void setCondEnd(Label condEnd) { this.condEnd = condEnd; }
 
     public boolean isInCond() { return inCond; }
     public void setInCond(boolean inCond) { this.inCond = inCond; }
@@ -203,7 +204,7 @@ public class MethodWriter implements Opcodes
     public boolean getSkipFor() { return skipFor; }
     public void setSkipFor(boolean skipFor) { this.skipFor = skipFor; }
 
-    public TypeEnv getTypeEnv() { return tm; }
+    public TypeEnv getTypeEnv() { return te; }
 
     public String getParentName() { return parentName; }
 

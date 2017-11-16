@@ -47,11 +47,11 @@ public class ClassFile implements Opcodes
 
         Path t = Paths.get("./" + name + ".class");
         Files.write(t, data.toByteArray());
-        Process p = Runtime.getRuntime().exec("java " + name);
-        p.waitFor();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line;
-        while ((line = reader.readLine()) != null) System.out.println(line);
+//        Process p = Runtime.getRuntime().exec("java " + name);
+//        p.waitFor();
+//        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+//        String line;
+//        while ((line = reader.readLine()) != null) System.out.println(line);
 //        Files.delete(t); // comment line to check .class file
     }
 

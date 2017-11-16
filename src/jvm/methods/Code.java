@@ -6,21 +6,18 @@ import jvm.classes.ClassFile;
 import util.ByteList;
 import util.Pair;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Code extends AttributeInfo implements Opcodes
 {
     private ByteList code = new ByteList();
     private List<AttributeInfo> attributes = new ArrayList<>();
-    private StackMapTable smt;
-    private Map<Frame, List<Pair<Integer, Frame>>> frames = new HashMap<>();
+    private SMTNew smt;
+    private Map<Label, Set<Integer>> frames = new HashMap<>();
 
     Code(ClassFile cls, MethodInfo method) {
         super(cls, "Code");
-        smt = new StackMapTable(cls, method.getParams());
+        smt = new SMTNew(cls, method.getParams());
     }
 
     public void addAttribute(AttributeInfo attribute) { attributes.add(attribute); }
@@ -49,8 +46,7 @@ public class Code extends AttributeInfo implements Opcodes
 
     /* Pop from stack to local */
     public void pop(byte opcode, byte localIndex, boolean insertLocalIndex) {
-        String type = smt.pop();
-        smt.store(localIndex, type);
+        smt.store(localIndex);
         code.addByte(opcode);
         if (insertLocalIndex) code.addByte(localIndex);
     }
@@ -86,44 +82,37 @@ public class Code extends AttributeInfo implements Opcodes
         code.addByte(opcode);
     }
 
-    private Map<Frame, Frame> jmps = new HashMap<>();
-    public void jmpOperator(byte opcode, int operands, Frame target) {
+    public void jmpOperator(byte opcode, int operands, Label target) {
         if (operands > 0) smt.pop(operands);
-        Frame here = assignFrame(new Frame(), false);
+        int i = code.size();
         code.addByte(opcode);
-        frames.putIfAbsent(target, new ArrayList<>());
-        frames.get(target).add(Pair.of(code.size(), here));
+        frames.putIfAbsent(target, new HashSet<>());
+        frames.get(target).add(i + 1);
         code.addShort(0x0000);
-        jmps.put(here, target);
+        smt.jmp(target, i);
     }
 
-    public void chop(int amt) { smt.chop(amt); }
+    public void chop(int amt) {}
 
-    public Frame assignFrame(Frame frame) { return assignFrame(frame, true); }
-    private Frame assignFrame(Frame frame, boolean use) {
-        if (frame.getOffset() != -1) throw new RuntimeException(); // fixme-maybe not?
-        frame.setOffset(code.size());
-        smt.setFrame(frame);
-        if (use) smt.useFrame();
-        return frame;
+    public Label assign(Label label) {
+        smt.assign(label, code.size());
+        return label;
     }
 
-    public String getStackHeadType() { return smt.peekStack(); }
-    public String getType(int localIndex) { return smt.load(localIndex); }
+    public String getStackHeadType() { return smt.peek(); }
+    public String getType(int localIndex) { return smt.localType(localIndex); }
+
+    public int getSize() { return code.size(); }
 
     @Override
     public ByteList toByteList() {
         if (smt.getSize() != 0) attributes.add(smt);
 
-        for (Frame frame : frames.keySet())
-            for (Pair<Integer, Frame> pair : frames.get(frame)) {
-                if (pair.getValue() == null ||
-                        !frame.getStack().equals(pair.getValue().getStack()))
-                    throw new RuntimeException("conditional code alters stack (" + frame.getStack() +  "->" + pair.getValue().getStack() + ')');
-
-                int offset = frame.getOffset() - pair.getKey() + 1;
-                code.set(pair.getKey(), (byte) (offset >> 8 & 0xFF));
-                code.set(pair.getKey() + 1, (byte) (offset & 0xFF));
+        for (Label frame : frames.keySet())
+            for (int pair : frames.get(frame)) {
+                int offset = frame.block.getOffset() - pair + 1;
+                code.set(pair, (byte) (offset >> 8 & 0xFF));
+                code.set(pair + 1, (byte) (offset & 0xFF));
             }
 
         info.addShort(smt.getMaxStack());     // max_stack

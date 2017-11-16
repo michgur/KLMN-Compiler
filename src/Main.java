@@ -3,6 +3,7 @@ import klmn.KLMN;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.*;
 
 /**
  * ಠ^ಠ.
@@ -38,8 +39,8 @@ public class Main implements Opcodes
      */
 
     /* 💩💩💩 AMAZING 💩💩💩 */
-    public static void main(String[] args) throws Exception {
-        String src = String.join("\n", Files.readAllLines(Paths.get(args[0])));
-        KLMN.compile("TEMP", src);
+    public static void main(String[] args) {
+        try {String src = String.join("\n", Files.readAllLines(Paths.get(args[0])));
+        KLMN.compile("TEMP", src);}catch (Exception e) {e.printStackTrace();}
     }
 }

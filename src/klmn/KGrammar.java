@@ -29,6 +29,8 @@ public interface KGrammar
     Terminal comma = new Terminal(",");
     Terminal openCurly = new Terminal("{");
     Terminal closeCurly = new Terminal("}");
+    Terminal openSquare = new Terminal("[");
+    Terminal closeSquare = new Terminal("]");
     Terminal kwIf = new Terminal("if");
     Terminal kwElse = new Terminal("else");
     Terminal kwFor = new Terminal("for");
@@ -95,6 +97,7 @@ public interface KGrammar
         MF.addProduction(MF, MF0);
 
         T.addProduction(id);
+        T.addProduction(T, openSquare, closeSquare);
 
         A.addProduction(id, assign, E);
 
@@ -163,6 +166,7 @@ public interface KGrammar
 
         //<editor-fold desc="tokenizing">
         TOKENIZER.addTerminal(assign, '=').addTerminal(plus, '+').addTerminal(semicolon, ';')
+                .addTerminal(openSquare, '[').addTerminal(closeSquare, ']')
                 .addTerminal(minus, '-').addTerminal(times, '*').addTerminal(lAnd, "&&").addTerminal(lOr, "||")
                 .addTerminal(divide, '/').addTerminal(openRound, '(').addTerminal(closeRound, ')')
                 .addTerminal(increment, "++").addTerminal(decrement, "--")

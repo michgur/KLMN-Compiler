@@ -41,6 +41,9 @@ public class MethodNode extends AST implements ModuleNode.BodyNode, Opcodes
         String moduleName = writer.getModule().getValue().getValue();
 
         String type = ((TypeNode) getChild(1)).get(writer).getDescriptor();
+        if (getValue().getValue().equals("main") && type.equals("V")
+                && params.length == 1 && params[0].equals("[Ljava/lang/StringBuilder;"))
+            params[0] = "[Ljava/lang/String;";  // todo- something safer (actually make args[] a java.lang.String array)
         ClassFile cf = writer.getModule().getClassFile();
         MethodWriter mw = new MethodWriter(moduleName, writer, true, cf.getConstPool(),
                 new MethodInfo(cf, getValue().getValue(), acc, type, params), pNames);

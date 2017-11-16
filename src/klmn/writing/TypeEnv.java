@@ -2,6 +2,8 @@ package klmn.writing;
 
 import ast.AST;
 import jvm.Opcodes;
+import jvm.methods.Label;
+import klmn.nodes.BoolExpNode;
 import klmn.nodes.ExpNode;
 import lang.Terminal;
 import util.Pair;
@@ -18,8 +20,16 @@ public class TypeEnv implements Opcodes
         return t;
     }
 
-    public Type getForName(String name) {
-        for (Type t : types) if (t.name.equals(name)) return t;
+    public Type getForName(String name) { return getForName(name, 0); }
+    public Type getForName(String name, int dim) {
+        for (Type t : types) {
+            if (!t.name.equals(name) || t.dim > dim) continue;
+            if (t.dim == dim) return t;
+            Type a = new Type(t.name,
+                    String.join("", Collections.nCopies(dim - t.dim, "[")) + t.desc, dim);
+            types.add(a);
+            return a;
+        }
         throw new RuntimeException("No defined type with name " + name);
     }
     public Type getForDescriptor(String desc) {
@@ -37,16 +47,17 @@ public class TypeEnv implements Opcodes
         add("double", "D");
         Type s = add("string", "Ljava/lang/StringBuilder;");
         Type bool = add("boolean", "Z");
-        add("stringArr", "[Ljava/lang/String;");
         add("void", "V");
         Type sl = add("<stringL>", "Ljava/lang/String;"); // only for literals
+        Type sla = add("<stringL[]>", "[Ljava/lang/String;"); // only for main args
 
         binaryOps = new HashMap<>();
+        binaryCondOps = new HashMap<>();
         assignOps = new HashMap<>();
 
         // addition for strings appears to be more complicated
         Terminal add = new Terminal("+"), sub = new Terminal("-"),
-                mul = new Terminal("*"), div = new Terminal("/");
+                mul = new Terminal("*"), div = new Terminal("/"), eq = new Terminal("==");
         putOp(add, i, i, new OpSame(IADD), i);
         putOp(add, f, f, new OpSame(FADD), f);
         putOp(add, i, f, new OpIF(FADD), f);
@@ -80,7 +91,6 @@ public class TypeEnv implements Opcodes
         putStringOp(i);
         putStringOp(f);
         putStringOp(bool);
-
         // slightly better versions
         putOp(add, sl, s, (writer, a, b) -> {
             b.write(writer);
@@ -93,6 +103,42 @@ public class TypeEnv implements Opcodes
             b.write(writer);
             writer.call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", "Ljava/lang/String;");
         }, s);
+
+        putBoolOp(eq, i, i, (writer, a, b) -> {
+            a.write(writer);
+            b.write(writer);
+            Label tr = new Label(), end = new Label();
+            writer.useJmpOperator(IF_ICMPNE, tr);
+            writer.pushInt(1);
+            writer.useJmpOperator(GOTO, end);
+            writer.assign(tr);
+//            writer.pushInt(1);
+            writer.pushInt(0);
+            writer.assign(end);
+        }, (writer, a, b) -> {
+            a.write(writer);
+            b.write(writer);
+            if (writer.getSkipFor()) writer.useJmpOperator(IF_ICMPEQ, writer.getCondEnd());
+            else writer.useJmpOperator(IF_ICMPNE, writer.getCondEnd());
+        });
+        putBoolOp(eq, f, f, (writer, a, b) -> {
+            a.write(writer);
+            b.write(writer);
+            Label tr = new Label(), end = new Label();
+            writer.useOperator(FCMPG);
+            writer.useJmpOperator(IFEQ, tr);
+            writer.pushInt(0);
+            writer.useJmpOperator(GOTO, end);
+            writer.assign(tr);
+            writer.pushInt(1);
+            writer.assign(end);
+        }, (writer, a, b) -> {
+            a.write(writer);
+            b.write(writer);
+            writer.useOperator(FCMPG);
+            if (writer.getSkipFor()) writer.useJmpOperator(IFEQ, writer.getCondEnd());
+            else writer.useJmpOperator(IFNE, writer.getCondEnd());
+        });
     }
     private void putStringOp(Type t) {
         Terminal add = new Terminal("+");
@@ -164,17 +210,24 @@ public class TypeEnv implements Opcodes
     }
 
     private Map<Terminal, Map<Pair<Type, Type>, Pair<BinaryOperator, Type>>> binaryOps;
+    private Map<Terminal, Map<Pair<Type, Type>, BinaryOperator>> binaryCondOps;
     private Map<Pair<Type, Type>, AssignOperator> assignOps;
 
     public interface AssignOperator { void op(MethodWriter writer, AST a, ExpNode b); }
     public interface BinaryOperator { void op(MethodWriter writer, ExpNode a, ExpNode b); }
     // todo: something scope-based (for op overloading)
     // todo: exception for undefined operators
-    public void putOp(Terminal op, Type a, Type b, BinaryOperator code, Type res) {
+    private void putBoolOp(Terminal op, Type a, Type b, BinaryOperator exp, BinaryOperator cond) {
+        binaryOps.putIfAbsent(op, new HashMap<>());
+        binaryOps.get(op).put(Pair.of(a, b), Pair.of(exp, getForDescriptor("Z")));
+        binaryCondOps.putIfAbsent(op, new HashMap<>());
+        binaryCondOps.get(op).put(Pair.of(a, b), cond);
+    }
+    private void putOp(Terminal op, Type a, Type b, BinaryOperator code, Type res) {
         binaryOps.putIfAbsent(op, new HashMap<>());
         binaryOps.get(op).put(Pair.of(a, b), Pair.of(code, res));
     }
-    public void putOpAssign(Type a, Type b, AssignOperator op) { assignOps.put(Pair.of(a, b), op); }
+    private void putOpAssign(Type a, Type b, AssignOperator op) { assignOps.put(Pair.of(a, b), op); }
 
     public void binaryOp(MethodWriter writer, Terminal op, ExpNode a, ExpNode b) {
         Type ta = a.getType(writer), tb = b.getType(writer);
@@ -198,12 +251,21 @@ public class TypeEnv implements Opcodes
             writer.popToVar(a.getValue().getValue());
         } else assignOps.get(Pair.of(ta, tb)).op(writer, a, b);
     }
+    public void binaryBoolOp(MethodWriter writer, Terminal op, ExpNode a, ExpNode b) {
+        Type ta = a.getType(writer), tb = b.getType(writer);
+        BinaryOperator code;
+        if (writer.isInCond()) code = binaryCondOps.get(op).get(Pair.of(ta, tb));
+        else code = binaryOps.get(op).get(Pair.of(ta, tb)).getKey();
+        if (code == null)
+            throw new RuntimeException("no " + op + " operator defined for types " + ta.getName() + ", " + tb.getName());
+        code.op(writer, a, b);
+    }
 
     public static class Type
     {
         private String desc, name;
         private int dim; // -ensions
-        private Type(String name, String desc) { this(name, desc, 1); }
+        private Type(String name, String desc) { this(name, desc, 0); }
         private Type(String name, String desc, int dim) {
             this.name = name;
             this.desc = desc;
@@ -213,7 +275,7 @@ public class TypeEnv implements Opcodes
         public String getName() { return name; }
         public String getDescriptor() { return desc; }
 
-        public boolean isArray() { return dim > 1; }
+        public boolean isArray() { return dim > 0; }
         public int getDimensions() { return dim; }
 
         @Override

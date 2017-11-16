@@ -3,13 +3,11 @@ package klmn;
 import ast.AST;
 import ast.ASTFactory;
 import jvm.Opcodes;
-import jvm.methods.Frame;
+import jvm.methods.Label;
 import klmn.nodes.*;
 import klmn.writing.MethodWriter;
 import lang.*;
 import parsing.Parser;
-
-import java.util.List;
 
 import static klmn.writing.TypeEnv.Type;
 
@@ -78,7 +76,8 @@ public class KLMN implements Opcodes, KGrammar
             return c[0];
         });
 
-        factory.addProduction(T, new Symbol[] { id }, c -> new TypeNode(c[0].getValue())); // todo: create TypeNode
+        factory.addProduction(T, new Symbol[] { id }, c -> new TypeNode(c[0].getValue()));
+        factory.addProduction(T, new Symbol[] { T, openSquare, closeSquare }, c -> ((TypeNode) c[0]).arrayOfThis());
 
         factory.addProduction(A, new Symbol[] { id, assign, E }, c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
             @Override protected Type typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getValue().getValue()); }
@@ -226,24 +225,24 @@ public class KLMN implements Opcodes, KGrammar
                         return b;
                     }
                     @Override protected void writeCond(MethodWriter writer) {
-                        Frame end = writer.getCondEnd(), body = new Frame();
+                        Label end = writer.getCondEnd(), body = new Label();
                         writer.setCondEnd(body);
                         writer.setSkipFor(!writer.getSkipFor());
                         getExpChild(0).write(writer); // true -> skip to 'body', false -> resume
                         writer.setSkipFor(!writer.getSkipFor());
                         writer.setCondEnd(end);
                         getExpChild(1).write(writer); // true -> resume, false -> skip to 'end'
-                        writer.assignFrame(body);
+                        writer.assign(body);
                     }
                     @Override protected void writeExp(MethodWriter writer) {
-                        Frame cond2 = new Frame(), end = new Frame();
+                        Label cond2 = new Label(), end = new Label();
                         getExpChild(0).write(writer);
                         writer.useJmpOperator(IFEQ, cond2); // if false(=0), check other cond
                         writer.pushInt(1); // if true(=0), push true and end
                         writer.useJmpOperator(GOTO, end);
-                        writer.assignFrame(cond2); // here we get the final result
+                        writer.assign(cond2); // here we get the final result
                         getExpChild(1).write(writer);
-                        writer.assignFrame(end);
+                        writer.assign(end);
                     }
                 });
         factory.addProduction(T6, new Symbol[] { T5 }, c -> c[0]);
@@ -266,43 +265,31 @@ public class KLMN implements Opcodes, KGrammar
                         getExpChild(1).write(writer);
                     }
                     @Override protected void writeExp(MethodWriter writer) {
-                        Frame cond2 = new Frame(), end = new Frame();
+                        Label cond2 = new Label(), end = new Label();
                         getExpChild(0).write(writer);
                         writer.useJmpOperator(IFNE, cond2); // if true(=1), check other cond
                         writer.pushInt(0); // if false(=0), push false and end
                         writer.useJmpOperator(GOTO, end);
-                        writer.assignFrame(cond2); // here we get the final result
+                        writer.assign(cond2); // here we get the final result
                         getExpChild(1).write(writer);
-                        writer.assignFrame(end);
+                        writer.assign(end);
                     }
                 });
         factory.addProduction(T5, new Symbol[] { T4 }, c -> c[0]);
         factory.addProduction(T5, new Symbol[] { T5, eq, T4 },
-                c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
-                    @Override public Type typeCheck(MethodWriter writer) {
-                        Type t = getExpChild(0).getType(writer); // todo: something better
-                        if (getExpChild(1).getType(writer) != t) throw new TypeException();
-                        return t;
-                    }
-                    @Override protected void writeCond(MethodWriter writer) {
-                        getExpChild(0).write(writer);
-                        getExpChild(1).write(writer);
-                        writer.useOperator(FCMPG);
-                        if (writer.getSkipFor()) writer.useJmpOperator(IFEQ, writer.getCondEnd());
-                        else writer.useJmpOperator(IFNE, writer.getCondEnd());
-                    }
-                    @Override protected void writeExp(MethodWriter writer) {
-                        getExpChild(0).write(writer);
-                        getExpChild(1).write(writer);
-                        writer.useOperator(FCMPG);
-                        Frame t = new Frame(), f = new Frame();
-                        writer.useJmpOperator(IFNE, f);
-                        writer.pushInt(1);
-                        writer.useJmpOperator(GOTO, t);
-                        writer.assignFrame(f);
-                        writer.pushInt(0);
-                        writer.assignFrame(t);
-                    }
+                c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
+                    @Override public void write(MethodWriter writer)
+                    { writer.getTypeEnv().binaryBoolOp(writer, getValue().getType(), getExpChild(0), getExpChild(1)); }
+                    @Override public Type typeCheck(MethodWriter writer) { return writer.getTypeEnv().getForDescriptor("Z"); }
+//                    @Override protected void writeCond(MethodWriter writer) {
+//                        getExpChild(0).write(writer);
+//                        getExpChild(1).write(writer);
+//                        writer.useOperator(FCMPG);
+//                        if (writer.getSkipFor()) writer.useJmpOperator(IFEQ, writer.getCondEnd());
+//                        else writer.useJmpOperator(IFNE, writer.getCondEnd());
+//                    }
+//                    @Override protected void writeExp(MethodWriter writer)
+//                    { writer.getTypeEnv().binaryOp(writer, getValue().getType(), getExpChild(0), getExpChild(1)); }
                 });
         factory.addProduction(T5, new Symbol[] { T5, ne, T4 },
                 c -> new BoolExpNode(c[1].getValue(), c[0], c[2]) {
@@ -343,13 +330,13 @@ public class KLMN implements Opcodes, KGrammar
                         getExpChild(0).write(writer);
                         writer.useOperator(FCMPG);
                         writer.pushInt(1);
-                        Frame t = new Frame(), f = new Frame();
+                        Label t = new Label(), f = new Label();
                         writer.useJmpOperator(IF_ICMPNE, f);
                         writer.pushInt(1);
                         writer.useJmpOperator(GOTO, t);
-                        writer.assignFrame(f);
+                        writer.assign(f);
                         writer.pushInt(0);
-                        writer.assignFrame(t);
+                        writer.assign(t);
                     }
                 });
         factory.addProduction(T4, new Symbol[] { T4, gt, T3 },
@@ -371,13 +358,13 @@ public class KLMN implements Opcodes, KGrammar
                         getExpChild(1).write(writer);
                         writer.useOperator(FCMPG);
                         writer.pushInt(1);
-                        Frame t = new Frame(), f = new Frame();
+                        Label t = new Label(), f = new Label();
                         writer.useJmpOperator(IF_ICMPNE, f);
                         writer.pushInt(1);
                         writer.useJmpOperator(GOTO, t);
-                        writer.assignFrame(f);
+                        writer.assign(f);
                         writer.pushInt(0);
-                        writer.assignFrame(t);
+                        writer.assign(t);
                     }
                 });
         factory.addProduction(T4, new Symbol[] { T4, le, T3 },
@@ -399,13 +386,13 @@ public class KLMN implements Opcodes, KGrammar
                         getExpChild(1).write(writer);
                         writer.useOperator(FCMPG);
                         writer.pushInt(1);
-                        Frame t = new Frame(), f = new Frame();
+                        Label t = new Label(), f = new Label();
                         writer.useJmpOperator(IF_ICMPEQ, f);
                         writer.pushInt(1);
                         writer.useJmpOperator(GOTO, t);
-                        writer.assignFrame(f);
+                        writer.assign(f);
                         writer.pushInt(0);
-                        writer.assignFrame(t);
+                        writer.assign(t);
                     }
                 });
         factory.addProduction(T4, new Symbol[] { T4, ge, T3 },
@@ -427,13 +414,13 @@ public class KLMN implements Opcodes, KGrammar
                         getExpChild(1).write(writer);
                         writer.useOperator(FCMPG);
                         writer.pushInt(1);
-                        Frame t = new Frame(), f = new Frame();
+                        Label t = new Label(), f = new Label();
                         writer.useJmpOperator(IF_ICMPEQ, f);
                         writer.pushInt(1);
                         writer.useJmpOperator(GOTO, t);
-                        writer.assignFrame(f);
+                        writer.assign(f);
                         writer.pushInt(0);
-                        writer.assignFrame(t);
+                        writer.assign(t);
                     }
                 });
         factory.addProduction(T4, new Symbol[] { T3 }, c -> c[0]);

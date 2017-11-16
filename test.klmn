@@ -1,20 +1,6 @@
-public float max(float a, float b) {
-    if (a > b) return a;
-    return b;
-}
-
-public void pooPrint() { print poo; }
-
-int poo = 1f;
-string bananas = "bananas " + "in pajamas";
-string b = bananas;
-public void main(stringArr args) {
-    float f = 1 * 1f;
-    float poo = 2;
-    int poo2 = 2f;
-    print "hello, " + poo + ", how r u?";
-    print poo, poo2,;
-    pooPrint();
+int a = 1; int b = 2;
+public void main(string[] args) {
+    print a * 2 == b;
 }
 
 #

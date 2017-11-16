@@ -1,7 +1,7 @@
 package klmn.nodes;
 
 import ast.AST;
-import jvm.methods.Frame;
+import jvm.methods.Label;
 import klmn.writing.MethodWriter;
 import lang.Token;
 
@@ -11,7 +11,7 @@ public class IfNode extends StmtNode
 
     @Override
     public void write(MethodWriter writer) {
-        Frame end = new Frame();
+        Label end = new Label();
         writer.setCondEnd(end);
         writer.setInCond(true);
         ((ExpNode) getChild(0)).write(writer);
@@ -19,6 +19,6 @@ public class IfNode extends StmtNode
         writer.enterScope();
         ((StmtNode) getChild(1)).write(writer);
         writer.exitScope();
-        writer.assignFrame(end);
+        writer.assign(end);
     }
 }
