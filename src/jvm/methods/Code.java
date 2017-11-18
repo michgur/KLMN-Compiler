@@ -4,7 +4,6 @@ import jvm.AttributeInfo;
 import jvm.Opcodes;
 import jvm.classes.ClassFile;
 import util.ByteList;
-import util.Pair;
 
 import java.util.*;
 
@@ -12,12 +11,12 @@ public class Code extends AttributeInfo implements Opcodes
 {
     private ByteList code = new ByteList();
     private List<AttributeInfo> attributes = new ArrayList<>();
-    private SMTNew smt;
+    private StackMapTable smt;
     private Map<Label, Set<Integer>> frames = new HashMap<>();
 
     Code(ClassFile cls, MethodInfo method) {
         super(cls, "Code");
-        smt = new SMTNew(cls, method.getParams());
+        smt = new StackMapTable(cls, method.getParams());
     }
 
     public void addAttribute(AttributeInfo attribute) { attributes.add(attribute); }
@@ -42,11 +41,12 @@ public class Code extends AttributeInfo implements Opcodes
     }
 
     /* Pop from stack to local (op takes localIndex as parameter) */
-    public void pop(byte opcode, byte localIndex) { pop(opcode, localIndex, true); }
+    public void pop(byte opcode, String type, byte localIndex) { pop(opcode, type, localIndex, true); }
 
     /* Pop from stack to local */
-    public void pop(byte opcode, byte localIndex, boolean insertLocalIndex) {
-        smt.store(localIndex);
+    public void pop(byte opcode, String type, byte localIndex, boolean insertLocalIndex) {
+        smt.pop();
+        smt.store(localIndex, type);
         code.addByte(opcode);
         if (insertLocalIndex) code.addByte(localIndex);
     }
@@ -89,7 +89,7 @@ public class Code extends AttributeInfo implements Opcodes
         frames.putIfAbsent(target, new HashSet<>());
         frames.get(target).add(i + 1);
         code.addShort(0x0000);
-        smt.jmp(target, i);
+        smt.jmp(target, i, opcode == GOTO);
     }
 
     public void chop(int amt) {}
@@ -98,9 +98,6 @@ public class Code extends AttributeInfo implements Opcodes
         smt.assign(label, code.size());
         return label;
     }
-
-    public String getStackHeadType() { return smt.peek(); }
-    public String getType(int localIndex) { return smt.localType(localIndex); }
 
     public int getSize() { return code.size(); }
 
@@ -123,6 +120,7 @@ public class Code extends AttributeInfo implements Opcodes
         info.addShort(attributes.size());     // attributes_count
         for (AttributeInfo attrib : attributes)
             info.addAll(attrib.toByteList()); // attributes[attributes_count]
+//        info.addShort(0);
 
         return super.toByteList();
     }

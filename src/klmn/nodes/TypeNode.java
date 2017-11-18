@@ -14,6 +14,7 @@ public class TypeNode extends AST
     public TypeEnv.Type get(MethodWriter writer) { return writer.getTypeEnv().getForName(getValue().getValue(), dim); }
     public TypeNode arrayOfThis() {
         TypeNode t = new TypeNode(getValue());
+        if (dim >= 15) throw new RuntimeException("maximum array dimensions: 15");
         t.dim = dim + 1;
         return t;
     }

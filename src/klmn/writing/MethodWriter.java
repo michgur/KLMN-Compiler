@@ -69,7 +69,6 @@ public class MethodWriter implements Opcodes
         code.invoke(INVOKESPECIAL, constPool.addMethodref(cls, "<init>",
                 '(' + String.join("", params) + ")V"), "V", params.length, false);
     }
-    public void dup() { code.push(DUP, code.getStackHeadType()); }
     public void pushField(String cls, String field, String type)
     { code.push(GETFIELD, constPool.addFieldref(cls, field, type), type); }
     public void pushStaticField(String cls, String field, String type) // TODO: convert to JVM types by yourself
@@ -88,10 +87,11 @@ public class MethodWriter implements Opcodes
     }
     public void pushVar(String name) {
         int index = st.findSymbol(name);
+        String desc = st.typeOf(name).getDescriptor();
         switch (st.scopeTypeOf(name)) {
             case FUNCTION:
             case BLOCK: // local variable
-                switch (code.getType(index)) {
+                switch (desc) {
                     case "I":
                         if (index <= 3) code.push((byte) (ILOAD_0 + index), "I");
                         else code.push(ILOAD, (byte) index, "I");
@@ -101,32 +101,32 @@ public class MethodWriter implements Opcodes
                         else code.push(FLOAD, (byte) index, "F");
                         break;
                     default:
-                        if (index <= 3) code.push((byte) (ALOAD_0 + index), code.getType(index));
-                        else code.push(ALOAD, (byte) index, code.getType(index));
+                        if (index <= 3) code.push((byte) (ALOAD_0 + index), desc);
+                        else code.push(ALOAD, (byte) index, desc);
                 } break;
             case MODULE: // field of same module
-                String type = st.typeOf(name).getDescriptor();
-                pushStaticField(parentName, name, type); // todo: something nicer and more object-oriented (variable class and shit like that)
+                pushStaticField(parentName, name, desc); // todo: something nicer and more object-oriented (variable class and shit like that)
         }
     }
     public void pop() { code.pop(POP); }
     public void popToVar(String name) {
         int i = findSymbol(name);
+        String desc = st.typeOf(name).getDescriptor();
         switch (st.scopeTypeOf(name)) {
             case FUNCTION:
             case BLOCK:
-                switch (code.getStackHeadType()) {
+                switch (desc) {
                     case "I":
-                        if (i <= 3) code.pop((byte) (ISTORE_0 + i), (byte) i, false);
-                        else code.pop(ISTORE, (byte) i, true);
+                        if (i <= 3) code.pop((byte) (ISTORE_0 + i), "I", (byte) i, false);
+                        else code.pop(ISTORE, "I", (byte) i, true);
                         break;
                     case "F":
-                        if (i <= 3) code.pop((byte) (FSTORE_0 + i), (byte) i, false);
-                        else code.pop(FSTORE, (byte) i, true);
+                        if (i <= 3) code.pop((byte) (FSTORE_0 + i), "F", (byte) i, false);
+                        else code.pop(FSTORE, "F", (byte) i, true);
                         break;
                     default:
-                        if (i <= 3) code.pop((byte) (ASTORE_0 + i), (byte) i, false);
-                        else code.pop(ASTORE, (byte) i, true);
+                        if (i <= 3) code.pop((byte) (ASTORE_0 + i), desc, (byte) i, false);
+                        else code.pop(ASTORE, desc, (byte) i, true);
                 } break;
             case MODULE:
                 popToStaticField(parentName, name, st.typeOf(name).getDescriptor());
@@ -176,16 +176,16 @@ public class MethodWriter implements Opcodes
         }
     }
 
-    public void ret() {
+    public void ret() { ret("V"); }
+    public void ret(String type) {
         st.ret();
-        String type = code.getStackHeadType();
-        if (type == null) code.retOperator(RETURN, true);
-        else switch (type) {
+        switch (type) {
+            case "V": code.retOperator(RETURN, true); break;
             case "I": code.retOperator(IRETURN, false); break;
             case "F": code.retOperator(FRETURN, false); break;
             case "J": code.retOperator(LRETURN, false); break;
             case "D": code.retOperator(DRETURN, false); break;
-            // todo: more types
+            default: code.retOperator(ARETURN, false);
         }
     }
 

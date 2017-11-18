@@ -1,9 +1,6 @@
 package jvm.methods;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Stack;
+import java.util.*;
 
 class Frame implements Comparable
 {
@@ -35,8 +32,8 @@ class Frame implements Comparable
         if (!(obj instanceof Frame)) return false;
         Frame f = (Frame) obj;
         if (f.locals.size() != locals.size() || f.stack.size() != stack.size()) return false;
-        for (int i = 0; i < stack.size(); i++) if (!stack.get(i).equals(f.stack.get(i))) return false;
-        for (int i = 0; i < locals.size(); i++) if (!locals.get(i).equals(f.locals.get(i))) return false;
+        for (int i = 0; i < stack.size(); i++) if (!Objects.equals(stack.get(i), f.stack.get(i))) return false;
+        for (int i = 0; i < locals.size(); i++) if (!Objects.equals(locals.get(i), f.locals.get(i))) return false;
         return true;
     }
 

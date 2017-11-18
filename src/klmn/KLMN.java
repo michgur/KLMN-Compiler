@@ -189,7 +189,7 @@ public class KLMN implements Opcodes, KGrammar
         factory.addProduction(S, new Symbol[] { kwReturn, E, semicolon }, c -> new StmtNode(c[0].getValue(), c[1]) {
             @Override public void write(MethodWriter writer) {
                 ((ExpNode) getChild(0)).write(writer);
-                writer.ret();
+                writer.ret(((ExpNode) getChild(0)).getType(writer).getDescriptor());
             }
         });
 

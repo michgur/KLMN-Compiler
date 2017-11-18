@@ -28,6 +28,13 @@ public class SymbolTable
             if (scope.getKey().containsKey(symbol)) return scope.getKey().get(symbol).getValue();
         throw new RuntimeException("symbol " + symbol + " not defined!");
     }
+    /* only for lower level classes (like MethodWriter) */
+    public Type typeOf(int index) {
+        for (Scope scope : st)
+            for (Pair<Integer, Type> p : scope.getKey().values())
+                if (p.getKey() == index) return p.getValue();
+        throw new RuntimeException("no symbol at index " + index + '!');
+    }
     public ScopeType scopeTypeOf(String symbol) {
         for (Scope scope : st)
             if (scope.getKey().containsKey(symbol)) return scope.getValue();

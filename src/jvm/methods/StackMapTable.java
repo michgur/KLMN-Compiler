@@ -7,7 +7,9 @@ import util.ByteList;
 
 import java.util.*;
 
-public class SMTNew extends AttributeInfo implements Opcodes
+/* This shitty implementation of the mess that is the StackMapTable attribute does not check the validity of the bytecode.
+ * It also does not provide any type information. The compiler is expected to handle type information by its own. */
+public class StackMapTable extends AttributeInfo implements Opcodes
 {
     public static final byte SAME = 0; // to 63
     public static final byte SAME_LOCALS_1_STACK_ITEM = 64; // to 127
@@ -27,13 +29,13 @@ public class SMTNew extends AttributeInfo implements Opcodes
     public static final byte ITEM_Object = 7;
     public static final byte ITEM_Uninitialized = 8;
 
-    private static final String POP = "--pop";
+    private static final String POP = "^", UNKNOWN = "?";
 
     private Block current = new Block(-1), first = current;
     private Frame frame = new Frame(), firstFrame = new Frame();
     private short maxStack, maxLocals, nStack = 0;
     private Set<Label> targets = new HashSet<>();
-    public SMTNew(ClassFile cls, String[] params) {
+    public StackMapTable(ClassFile cls, String[] params) {
         super(cls, "StackMapTable");
         Collections.addAll(frame.getLocals(), params);
         Collections.addAll(firstFrame.getLocals(), params);
@@ -45,102 +47,98 @@ public class SMTNew extends AttributeInfo implements Opcodes
         current.out.getStack().push(type);
         frame.getStack().push(type);
     }
-    public String pop() {
+    public void pop() {
         nStack--;
-        if (!current.out.getStack().isEmpty()) current.out.getStack().pop();
-        return frame.getStack().pop();
+        if (!current.out.getStack().isEmpty()
+                && current.out.getStack().peek() != UNKNOWN && current.out.getStack().peek() != POP)
+            current.out.getStack().pop();
+        else current.out.getStack().push(POP);
     }
-    public void pop(int n) {
-        nStack -= n;
-        for (int i = 0; i < n; i++) {
-            if (!current.out.getStack().isEmpty()) current.out.getStack().pop();
-            frame.getStack().pop();
-        }
-    }
+    public void pop(int n) { for (int i = 0; i < n; i++) pop(); }
 
-    public void store(int index) {
+    public void store(int index, String type) {
         if (index + 1 > maxLocals) maxLocals = (short) (index + 1);
         int nLocals = current.out.getLocals().size();
-        if (nLocals > index) current.out.getLocals().set(index, pop());
+        if (nLocals > index) current.out.getLocals().set(index, type);
         else {
-            for (int i = 0; i < index - nLocals; i++) current.out.getLocals().add(null);
-            current.out.getLocals().add(pop());
-        }
-        nLocals = frame.getLocals().size();
-        if (nLocals > index) frame.getLocals().set(index, pop());
-        else {
-            for (int i = 0; i < index - nLocals; i++) frame.getLocals().add(null);
-            frame.getLocals().add(pop());
+            for (int i = 0; i < index - nLocals; i++) current.out.getLocals().add(UNKNOWN);
+            current.out.getLocals().add(type);
         }
     }
 
-    public String peek() { return frame.getStack().isEmpty() ? null : frame.getStack().peek(); }
-    public String localType(int index) { return frame.getLocals().get(index); }
-
+    /* Number of StackMap entries */
     public int getSize() { return targets.size(); }
+    /* Required stack size for the method. Only use after fully writing code. */
     public short getMaxStack() { return maxStack; }
+    /* Required local array size for the method. Only use after fully writing code. */
     public short getMaxLocals() { return maxLocals; }
 
-    public void jmp(Label target, int currentIndex) {
+    /* Jump from codePointer to Label */
+    public void jmp(Label target, int codePointer, boolean isGOTO) {
         current.next.add(target);
         targets.add(target);
-        assign(new Label(), currentIndex);
+        Label next = new Label();
+        Block c = current;
+        assign(next, codePointer);
+        if (isGOTO) c.next.remove(next);
+//        System.out.println((isGOTO ? "going" : "jumping") + " from " + c + (target.block == null ? "" : " to " + target.block));
     }
-    public void assign(Label label, int currentIndex) {
-        label.block = new Block(currentIndex);
+    /* Assign a Label at codePointer */
+    public void assign(Label label, int codePointer) {
+        label.block = new Block(codePointer);
         current.next.add(label);
         current = label.block;
     }
 
-    static class Block {
-        private int offset;
+    /* Represents a basic-block of code */
+    static class Block implements Comparable {
+        private static int index = 0;
+        /* Code pointer for block start */
+        private int offset, i;
+        /* Input and output frames of block */
         private Frame in = new Frame(), out = new Frame();
+        // replace next (a set is not required, only two possible branch targets)
         private Set<Label> next = new HashSet<>();
-        public Block(int offset) { this.offset = offset; }
+        public Block(int offset) {
+            i = index++;
+            this.offset = offset;
+            out.getStack().push(UNKNOWN);
+            in.getStack().push(UNKNOWN);
+        }
         public int getOffset() { return offset; }
+        /* Used to sort blocks by code location */
+        @Override public int compareTo(Object o) { return Integer.compare(offset, ((Block) o).offset); }
+        @Override public String toString() { return "block " + i; }
     }
 
-    private void updateFrames() {
-        Set<Block> changed = new HashSet<>();
-        changed.add(first);
-        Frame in = firstFrame;
-        // todo next- figure out how to do this loop on the go
-        while (!changed.isEmpty()) {
-            Set<Block> next = new HashSet<>();
-            for (Block b : changed) {
-                Frame m = merge(b.in, in);
-                if (m.equals(b.in)) continue;
-                b.in = m;
-                in = merge(b.in, b.out);
-                b.next.forEach(l -> next.add(l.block));
-            }
-            changed = next;
-        }
+    private void updateFrames(Block block, Frame input) {
+        if (input.equals(block.in)) return;
+        block.in = merge(block.in, input); // this merge appears to be redundant
+        Frame nextInput = merge(block.in, block.out);
+        for (Label label : block.next) updateFrames(label.block, nextInput);
     }
 
     @Override
     public ByteList toByteList() {
         info.addShort(targets.size());
 
-        updateFrames();
+        updateFrames(first, firstFrame);
 
-        Block block = first;
-        Set<Label> labels = new TreeSet<>();
-        labels.addAll(targets);
-        System.out.println(block.in.getLocals());
-        for (Label l : labels) {
-            Frame frame = l.block.in, prev = block.in;
-            System.out.println(frame.getLocals());
-            int offsetDelta = l.block.offset - block.offset - 1;
+        Block prev = first;
+        Set<Block> blocks = new TreeSet<>(); // sorted set
+        targets.forEach(t -> blocks.add(t.block));
+        for (Block b : blocks) {
+            Frame frame = b.in;
+            int offsetDelta = b.offset - prev.offset - 1;
 
-            if (frame.getStack().empty() && frame.getLocals().equals(prev.getLocals())) {
+            if (frame.getStack().empty() && frame.getLocals().equals(prev.in.getLocals())) {
                 if (offsetDelta < 64) info.addByte(offsetDelta + SAME);
                 else {
                     info.addByte(SAME_FRAME_EXTENDED);
                     info.addShort(offsetDelta);
                 }
             }
-            else if (frame.getStack().size() == 1 && frame.getLocals().equals(prev.getLocals())) {
+            else if (frame.getStack().size() == 1 && frame.getLocals().equals(prev.in.getLocals())) {
                 if (offsetDelta < 64) info.addByte(offsetDelta + SAME_LOCALS_1_STACK_ITEM);
                 else {
                     info.addByte(SAME_LOCALS_1_STACK_ITEM_EXTENDED);
@@ -149,7 +147,7 @@ public class SMTNew extends AttributeInfo implements Opcodes
                 addVarInfo(frame.getStack().peek());
             }
             else {
-                int prevSize = prev.getLocals().size(), diff = frame.getLocals().size() - prevSize;
+                int prevSize = prev.in.getLocals().size(), diff = frame.getLocals().size() - prevSize;
                 if (frame.getStack().empty() && diff < 3 && diff > -3) {
                     info.addByte(251 + diff); // takes care of both chop & append frames
                     info.addShort(offsetDelta);
@@ -164,7 +162,7 @@ public class SMTNew extends AttributeInfo implements Opcodes
                     frame.getStack().forEach(this::addVarInfo);
                 }
             }
-            block = l.block;
+            prev = b;
         }
 
         return super.toByteList();
@@ -173,15 +171,20 @@ public class SMTNew extends AttributeInfo implements Opcodes
     private Frame merge(Frame a, Frame b) {
         Frame res = new Frame();
         int al = a.getLocals().size(), bl = b.getLocals().size();
+        // only use locals information of a when there is none in b
         for (int i = 0; i < bl; i++)
-            if (b.getLocals().get(i) == null && al > i) res.getLocals().add(a.getLocals().get(i));
+            if (b.getLocals().get(i) == UNKNOWN && al > i) res.getLocals().add(a.getLocals().get(i));
             else res.getLocals().add(b.getLocals().get(i));
-        for (int i = bl; i < al; i++)
+        if (bl == 0) for (int i = 0; i < al; i++)
             res.getLocals().add(a.getLocals().get(i));
 
-        // how do you merge stacks?
-//        res.getStack().addAll(a.getStack());
-        res.getStack().addAll(b.getStack()); // fixme this IS p̶r̶o̶b̶a̶b̶l̶y̶ incorrect, look into: github.com/llbit/ow2-asm/blob/a695934043d6f8f0aee3f6867c8dd167afd4aed8/src/org/objectweb/asm/Frame.java
+        if (!b.getStack().empty() && b.getStack().get(0) == UNKNOWN)
+            res.getStack().addAll(a.getStack());
+        b.getStack().forEach(i -> {
+            if (i == UNKNOWN) return;
+            if (i == POP) res.getStack().pop();
+            else res.getStack().push(i);
+        });
         return res;
     }
 
@@ -193,8 +196,6 @@ public class SMTNew extends AttributeInfo implements Opcodes
         } else switch (type) {
             case "I": info.addByte(ITEM_Integer); break;
             case "F": info.addByte(ITEM_Float); break;
-            case "J": info.addByte(ITEM_Long); break;
-            case "D": info.addByte(ITEM_Double); break;
             default: // fixme handle other ITEMs
                 info.addByte(ITEM_Object);
                 info.addShort(cls.getConstPool().addClass(type.substring(1, type.length() - 1)));
