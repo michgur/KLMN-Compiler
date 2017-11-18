@@ -111,6 +111,7 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         @Override public String toString() { return "block " + i; }
     }
 
+    // todo- for incorrect code this ends up with a StackOverFlow, do something nicer
     private void updateFrames(Block block, Frame input) {
         if (input.equals(block.in)) return;
         block.in = merge(block.in, input); // this merge appears to be redundant

@@ -85,6 +85,7 @@ public class MethodWriter implements Opcodes
         code.invoke(INVOKESTATIC, constPool.addMethodref(cls, method,
                 '(' + String.join("", params) + ')' + type), type, params.length, true);
     }
+    public void dup(TypeEnv.Type type) { code.push(DUP, type.getDescriptor()); }
     public void pushVar(String name) {
         int index = st.findSymbol(name);
         String desc = st.typeOf(name).getDescriptor();

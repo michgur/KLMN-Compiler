@@ -5,10 +5,13 @@ import jvm.Opcodes;
 import jvm.methods.Label;
 import klmn.nodes.BoolExpNode;
 import klmn.nodes.ExpNode;
+import klmn.nodes.NumberLiteral;
 import lang.Terminal;
 import util.Pair;
 
 import java.util.*;
+
+import static klmn.KGrammar.*;
 
 public class TypeEnv implements Opcodes
 {
@@ -54,26 +57,23 @@ public class TypeEnv implements Opcodes
         binaryOps = new HashMap<>();
         binaryCondOps = new HashMap<>();
         assignOps = new HashMap<>();
-
-        // addition for strings appears to be more complicated
-        Terminal add = new Terminal("+"), sub = new Terminal("-"),
-                mul = new Terminal("*"), div = new Terminal("/"), eq = new Terminal("==");
-        putOp(add, i, i, new OpSame(IADD), i);
-        putOp(add, f, f, new OpSame(FADD), f);
-        putOp(add, i, f, new OpIF(FADD), f);
-        putOp(add, f, i, new OpFI(FADD), f);
-        putOp(sub, i, i, new OpSame(ISUB), i);
-        putOp(sub, f, f, new OpSame(FSUB), f);
-        putOp(sub, i, f, new OpIF(FSUB), f);
-        putOp(sub, f, i, new OpFI(FSUB), f);
-        putOp(mul, i, i, new OpSame(IMUL), i);
-        putOp(mul, f, f, new OpSame(FMUL), f);
-        putOp(mul, i, f, new OpIF(FMUL), f);
-        putOp(mul, f, i, new OpFI(FMUL), f);
-        putOp(div, i, i, new OpSame(IDIV), i);
-        putOp(div, f, f, new OpSame(FDIV), f);
-        putOp(div, i, f, new OpIF(FDIV), f);
-        putOp(div, f, i, new OpFI(FDIV), f);
+        
+        putOp(plus, i, i, new OpSame(IADD), i);
+        putOp(plus, f, f, new OpSame(FADD), f);
+        putOp(plus, i, f, new OpIF(FADD), f);
+        putOp(plus, f, i, new OpFI(FADD), f);
+        putOp(minus, i, i, new OpSame(ISUB), i);
+        putOp(minus, f, f, new OpSame(FSUB), f);
+        putOp(minus, i, f, new OpIF(FSUB), f);
+        putOp(minus, f, i, new OpFI(FSUB), f);
+        putOp(times, i, i, new OpSame(IMUL), i);
+        putOp(times, f, f, new OpSame(FMUL), f);
+        putOp(times, i, f, new OpIF(FMUL), f);
+        putOp(times, f, i, new OpFI(FMUL), f);
+        putOp(divide, i, i, new OpSame(IDIV), i);
+        putOp(divide, f, f, new OpSame(FDIV), f);
+        putOp(divide, i, f, new OpIF(FDIV), f);
+        putOp(divide, f, i, new OpFI(FDIV), f);
         putOpAssign(i, f, (writer, a, b) -> {
             f2i(writer, b);
             writer.popToVar(a.getValue().getValue());
@@ -92,13 +92,13 @@ public class TypeEnv implements Opcodes
         putStringOp(f);
         putStringOp(bool);
         // slightly better versions
-        putOp(add, sl, s, (writer, a, b) -> {
+        putOp(plus, sl, s, (writer, a, b) -> {
             b.write(writer);
             writer.pushInt(0);
             a.write(writer);
             writer.call("java/lang/StringBuilder", "insert", "Ljava/lang/StringBuilder;", "I", "Ljava/lang/String;");
         }, s);
-        putOp(add, s, sl, (writer, a, b) -> {
+        putOp(plus, s, sl, (writer, a, b) -> {
             a.write(writer);
             b.write(writer);
             writer.call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", "Ljava/lang/String;");
@@ -112,7 +112,6 @@ public class TypeEnv implements Opcodes
             writer.pushInt(1);
             writer.useJmpOperator(GOTO, end);
             writer.assign(tr);
-//            writer.pushInt(1);
             writer.pushInt(0);
             writer.assign(end);
         }, (writer, a, b) -> {
