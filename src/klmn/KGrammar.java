@@ -7,6 +7,7 @@ public interface KGrammar
     Symbol M = new Symbol("Module");
     Symbol VD = new Symbol("VarDecl");
     Symbol FD = new Symbol("FuncDecl");
+    Symbol CD = new Symbol("ClassDecl");
     Symbol MF = new Symbol("Modifiers");
     Symbol MF0 = new Symbol("Modifiers0");
     Symbol T = new Symbol("Type");
@@ -17,9 +18,12 @@ public interface KGrammar
     Symbol B = new Symbol("Block");
     Symbol A = new Symbol("Assignment");
     Symbol P = new Symbol("Params");
+    Symbol PT = new Symbol("ParamTypes");
+    Symbol PT0 = new Symbol("ParamTypes0");
     Symbol PD = new Symbol("ParamsDecl");
     Symbol PD0 = new Symbol("ParamsDecl0");
     Symbol DI = new Symbol("Decrement/Increment");
+    Symbol ID = new Symbol("Identifier");
 
     Terminal id = new Terminal("identifier");
     Terminal assign = new Terminal("=");
@@ -31,6 +35,7 @@ public interface KGrammar
     Terminal closeCurly = new Terminal("}");
     Terminal openSquare = new Terminal("[");
     Terminal closeSquare = new Terminal("]");
+    Terminal kwClass = new Terminal("class");
     Terminal kwIf = new Terminal("if");
     Terminal kwElse = new Terminal("else");
     Terminal kwFor = new Terminal("for");
@@ -61,12 +66,14 @@ public interface KGrammar
     Terminal gt = new Terminal(">");
     Terminal le = new Terminal("<=");
     Terminal ge = new Terminal(">=");
+    Terminal arrow = new Terminal("=>");
     Terminal lAnd = new Terminal("&&");
     Terminal lOr = new Terminal("||");
     Terminal increment = new Terminal("++");
     Terminal decrement = new Terminal("--");
     Terminal kwTrue = new Terminal("true");
     Terminal kwFalse = new Terminal("false");
+    Terminal dot = new Terminal(".");
 
     Tokenizer TOKENIZER = new Tokenizer();
     Grammar GRAMMAR = init();
@@ -75,17 +82,20 @@ public interface KGrammar
         M.addProduction();
         M.addProduction(M, VD, semicolon);
         M.addProduction(M, FD);
+        M.addProduction(M, CD);
 
-        VD.addProduction(MF, T, id);
+        VD.addProduction(MF, T, ID);
         VD.addProduction(MF, T, A);
-        VD.addProduction(T, id);
+        VD.addProduction(T, ID);
         VD.addProduction(T, A);
 
         FD.addProduction(MF, T, id, openRound, PD, closeRound, openCurly, B, closeCurly);
         FD.addProduction(T, id, openRound, PD, closeRound, openCurly, B, closeCurly);
+
+        CD.addProduction(MF, kwClass, id, openCurly, M, closeCurly);
         
-        PD0.addProduction(T, id);
-        PD0.addProduction(PD0, comma, T, id);
+        PD0.addProduction(T, ID);
+        PD0.addProduction(PD0, comma, T, ID);
         PD.addProduction();
         PD.addProduction(PD0);
         
@@ -96,14 +106,21 @@ public interface KGrammar
         MF.addProduction(MF0);
         MF.addProduction(MF, MF0);
 
-        T.addProduction(id);
+        T.addProduction(ID);
         T.addProduction(T, openSquare, closeSquare);
+        T.addProduction(openRound, PT0, closeRound);
+//        lambdas, for later
+//        T.addProduction(openRound, PT, closeRound, arrow, T);
+        PT0.addProduction(T);
+        PT0.addProduction(PT0, comma, T);
+        PT.addProduction();
+        PT.addProduction(PT0);
 
-        A.addProduction(id, assign, E);
+        A.addProduction(ID, assign, E);
 
         SE.addProduction(A);
-        SE.addProduction(id, openRound, P, closeRound); // func call, add proper id symbol
-        SE.addProduction(id, openRound, closeRound); // func call, add proper id symbol
+        SE.addProduction(ID, openRound, P, closeRound); // func call, add proper ID symbol
+        SE.addProduction(ID, openRound, closeRound); // func call, add proper ID symbol
         SE.addProduction(DI);
 
         S.addProduction(SE, semicolon);
@@ -127,6 +144,9 @@ public interface KGrammar
 
         P.addProduction(E);
         P.addProduction(P, comma, E);
+        
+        ID.addProduction(id);
+        ID.addProduction(ID, dot, id);
 
         //<editor-fold desc="Expressions">
         E.addProduction(E, lOr, T6);
@@ -151,30 +171,31 @@ public interface KGrammar
         T1.addProduction(plus, T1);
         T1.addProduction(minus, T1);
         T1.addProduction(T0);
-        DI.addProduction(T0, decrement);
-        DI.addProduction(T0, increment);
-        DI.addProduction(increment, T0);
-        DI.addProduction(decrement, T0);
-        T0.addProduction(openRound, E, closeRound);
-        T0.addProduction(numberL);
-        T0.addProduction(stringL);
-        T0.addProduction(kwTrue);
-        T0.addProduction(kwFalse);
-        T0.addProduction(id);
-        T0.addProduction(SE);
+        DI.addProduction(ID, decrement);
+        DI.addProduction(ID, increment);
+        DI.addProduction(increment, ID);
+        DI.addProduction(decrement, ID);
+        T0.addProduction(openRound, E, closeRound); // todo
+        T0.addProduction(numberL);                  //  ^
+        T0.addProduction(stringL);                  //  |
+        T0.addProduction(kwTrue);                   //  |
+        T0.addProduction(kwFalse);                  //  |
+        T0.addProduction(ID);                       //  |
+        T0.addProduction(SE);                       //  v
+        T0.addProduction(openRound, P, closeRound); // this
         //</editor-fold>
 
         //<editor-fold desc="tokenizing">
         TOKENIZER.addTerminal(assign, '=').addTerminal(plus, '+').addTerminal(semicolon, ';')
-                .addTerminal(openSquare, '[').addTerminal(closeSquare, ']')
+                .addTerminal(openSquare, '[').addTerminal(closeSquare, ']').addTerminal(dot, '.')
                 .addTerminal(minus, '-').addTerminal(times, '*').addTerminal(lAnd, "&&").addTerminal(lOr, "||")
                 .addTerminal(divide, '/').addTerminal(openRound, '(').addTerminal(closeRound, ')')
                 .addTerminal(increment, "++").addTerminal(decrement, "--")
                 .addTerminal(kwPrint, "print").addTerminal(kwIf, "if").addTerminal(comma, ",")
                 .addTerminal(openCurly, '{').addTerminal(closeCurly, '}').addTerminal(kwFor, "for")
-                .addTerminal(kwTrue, "true").addTerminal(kwFalse, "false")
+                .addTerminal(kwTrue, "true").addTerminal(kwFalse, "false").addTerminal(arrow, "=>")
                 .addTerminal(eq, "==").addTerminal(ne, "!=").addTerminal(lt, '<')
-                .addTerminal(gt, '>').addTerminal(le, "<=").addTerminal(ge, ">=")
+                .addTerminal(gt, '>').addTerminal(le, "<=").addTerminal(ge, ">=").addTerminal(kwClass, "class")
                 .addTerminal(kwElse, "else").addTerminal(kwFinal, "final").addTerminal(kwStatic, "static")
                 .addTerminal(kwPrivate, "private").addTerminal(kwPublic, "public").addTerminal(kwReturn, "return")
                 .addTerminal(numberL, (src, i) -> {

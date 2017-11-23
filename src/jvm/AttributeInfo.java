@@ -16,7 +16,7 @@ public class AttributeInfo
         nameIndex = cls.getConstPool().addUtf8(name);
     }
 
-    public ByteList getInfo() { return info; }
+    public boolean include() { return true; }
 
     public ByteList toByteList() {
         if (converted) return cnvrtd;//throw new RuntimeException("can only convert AttributeInfo to ByteList once!");

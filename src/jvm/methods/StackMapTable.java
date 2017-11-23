@@ -32,42 +32,42 @@ public class StackMapTable extends AttributeInfo implements Opcodes
     private static final String POP = "^", UNKNOWN = "?";
 
     private Block current = new Block(-1), first = current;
-    private Frame frame = new Frame(), firstFrame = new Frame();
+    private Frame firstFrame = new Frame();
     private short maxStack, maxLocals, nStack = 0;
     private Set<Label> targets = new HashSet<>();
+    
     public StackMapTable(ClassFile cls, String[] params) {
         super(cls, "StackMapTable");
-        Collections.addAll(frame.getLocals(), params);
-        Collections.addAll(firstFrame.getLocals(), params);
+        Collections.addAll(firstFrame.locals, params);
         maxLocals = (short) params.length;
     }
 
     public void push(String type) {
         if (++nStack > maxStack) maxStack = nStack;
-        current.out.getStack().push(type);
-        frame.getStack().push(type);
+        current.out.stack.push(type);
     }
     public void pop() {
         nStack--;
-        if (!current.out.getStack().isEmpty()
-                && current.out.getStack().peek() != UNKNOWN && current.out.getStack().peek() != POP)
-            current.out.getStack().pop();
-        else current.out.getStack().push(POP);
+        if (!current.out.stack.isEmpty()
+                && current.out.stack.peek() != UNKNOWN && current.out.stack.peek() != POP)
+            current.out.stack.pop();
+        else current.out.stack.push(POP);
     }
     public void pop(int n) { for (int i = 0; i < n; i++) pop(); }
 
     public void store(int index, String type) {
         if (index + 1 > maxLocals) maxLocals = (short) (index + 1);
-        int nLocals = current.out.getLocals().size();
-        if (nLocals > index) current.out.getLocals().set(index, type);
+        int nLocals = current.out.locals.size();
+        if (nLocals > index) current.out.locals.set(index, type);
         else {
-            for (int i = 0; i < index - nLocals; i++) current.out.getLocals().add(UNKNOWN);
-            current.out.getLocals().add(type);
+            for (int i = 0; i < index - nLocals; i++) current.out.locals.add(UNKNOWN);
+            current.out.locals.add(type);
         }
     }
 
-    /* Number of StackMap entries */
-    public int getSize() { return targets.size(); }
+    @Override
+    public boolean include() { return !targets.isEmpty(); }
+
     /* Required stack size for the method. Only use after fully writing code. */
     public short getMaxStack() { return maxStack; }
     /* Required local array size for the method. Only use after fully writing code. */
@@ -81,13 +81,30 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         Block c = current;
         assign(next, codePointer);
         if (isGOTO) c.next.remove(next);
-//        System.out.println((isGOTO ? "going" : "jumping") + " from " + c + (target.block == null ? "" : " to " + target.block));
     }
+    
     /* Assign a Label at codePointer */
     public void assign(Label label, int codePointer) {
         label.block = new Block(codePointer);
         current.next.add(label);
         current = label.block;
+    }
+
+    /* Represents a StackMap Frame */
+    private static class Frame
+    {
+        private Stack<String> stack = new Stack<>();
+        private List<String> locals = new ArrayList<>();
+
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof Frame)) return false;
+            Frame f = (Frame) obj;
+            if (f.locals.size() != locals.size() || f.stack.size() != stack.size()) return false;
+            for (int i = 0; i < stack.size(); i++) if (!Objects.equals(stack.get(i), f.stack.get(i))) return false;
+            for (int i = 0; i < locals.size(); i++) if (!Objects.equals(locals.get(i), f.locals.get(i))) return false;
+            return true;
+        }
     }
 
     /* Represents a basic-block of code */
@@ -102,8 +119,8 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         public Block(int offset) {
             i = index++;
             this.offset = offset;
-            out.getStack().push(UNKNOWN);
-            in.getStack().push(UNKNOWN);
+            out.stack.push(UNKNOWN);
+            in.stack.push(UNKNOWN);
         }
         public int getOffset() { return offset; }
         /* Used to sort blocks by code location */
@@ -126,41 +143,41 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         updateFrames(first, firstFrame);
 
         Block prev = first;
-        Set<Block> blocks = new TreeSet<>(); // sorted set
+        Set<Block> blocks = new TreeSet<>(); // sorted set (Block implements Comparable)
         targets.forEach(t -> blocks.add(t.block));
         for (Block b : blocks) {
             Frame frame = b.in;
             int offsetDelta = b.offset - prev.offset - 1;
 
-            if (frame.getStack().empty() && frame.getLocals().equals(prev.in.getLocals())) {
+            if (frame.stack.empty() && frame.locals.equals(prev.in.locals)) {
                 if (offsetDelta < 64) info.addByte(offsetDelta + SAME);
                 else {
                     info.addByte(SAME_FRAME_EXTENDED);
                     info.addShort(offsetDelta);
                 }
             }
-            else if (frame.getStack().size() == 1 && frame.getLocals().equals(prev.in.getLocals())) {
+            else if (frame.stack.size() == 1 && frame.locals.equals(prev.in.locals)) {
                 if (offsetDelta < 64) info.addByte(offsetDelta + SAME_LOCALS_1_STACK_ITEM);
                 else {
                     info.addByte(SAME_LOCALS_1_STACK_ITEM_EXTENDED);
                     info.addShort(offsetDelta);
                 }
-                addVarInfo(frame.getStack().peek());
+                addVarInfo(frame.stack.peek());
             }
             else {
-                int prevSize = prev.in.getLocals().size(), diff = frame.getLocals().size() - prevSize;
-                if (frame.getStack().empty() && diff < 3 && diff > -3) {
+                int prevSize = prev.in.locals.size(), diff = frame.locals.size() - prevSize;
+                if (frame.stack.empty() && diff < 3 && diff > -3) {
                     info.addByte(251 + diff); // takes care of both chop & append frames
                     info.addShort(offsetDelta);
-                    for (int t = 0; t < diff; t++) addVarInfo(frame.getLocals().get(t + prevSize));
+                    for (int t = 0; t < diff; t++) addVarInfo(frame.locals.get(t + prevSize));
                 }
                 else {
                     info.addByte(FULL_FRAME);
                     info.addShort(offsetDelta);
-                    info.addShort(frame.getLocals().size());
-                    frame.getLocals().forEach(this::addVarInfo);
-                    info.addShort(frame.getStack().size());
-                    frame.getStack().forEach(this::addVarInfo);
+                    info.addShort(frame.locals.size());
+                    frame.locals.forEach(this::addVarInfo);
+                    info.addShort(frame.stack.size());
+                    frame.stack.forEach(this::addVarInfo);
                 }
             }
             prev = b;
@@ -171,26 +188,25 @@ public class StackMapTable extends AttributeInfo implements Opcodes
 
     private Frame merge(Frame a, Frame b) {
         Frame res = new Frame();
-        int al = a.getLocals().size(), bl = b.getLocals().size();
+        int al = a.locals.size(), bl = b.locals.size();
         // only use locals information of a when there is none in b
         for (int i = 0; i < bl; i++)
-            if (b.getLocals().get(i) == UNKNOWN && al > i) res.getLocals().add(a.getLocals().get(i));
-            else res.getLocals().add(b.getLocals().get(i));
+            if (b.locals.get(i) == UNKNOWN && al > i) res.locals.add(a.locals.get(i));
+            else res.locals.add(b.locals.get(i));
         if (bl == 0) for (int i = 0; i < al; i++)
-            res.getLocals().add(a.getLocals().get(i));
+            res.locals.add(a.locals.get(i));
 
-        if (!b.getStack().empty() && b.getStack().get(0) == UNKNOWN)
-            res.getStack().addAll(a.getStack());
-        b.getStack().forEach(i -> {
+        if (!b.stack.empty() && b.stack.get(0) == UNKNOWN)
+            res.stack.addAll(a.stack);
+        b.stack.forEach(i -> {
             if (i == UNKNOWN) return;
-            if (i == POP) res.getStack().pop();
-            else res.getStack().push(i);
+            if (i == POP) res.stack.pop();
+            else res.stack.push(i);
         });
         return res;
     }
 
     private void addVarInfo(String type) {
-        if (type == null) return; // handle items that take 2 locations
         if (type.startsWith("[")) {
             info.addByte(ITEM_Object);
             info.addShort(cls.getConstPool().addClass(type));

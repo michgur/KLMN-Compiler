@@ -1,5 +1,6 @@
 package klmn.writing;
 
+import klmn.writing.types.Type;
 import util.Pair;
 
 import java.util.ArrayDeque;
@@ -7,12 +8,15 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 
-import static klmn.writing.TypeEnv.Type;
-
 public class SymbolTable
 {
     private Deque<Scope> st = new ArrayDeque<>();
 
+    public void put(String symbol, Type type, int i) {
+        if (st.peek().getKey().containsKey(symbol))
+            throw new RuntimeException("symbol " + symbol + " already defined!");
+        st.peek().getKey().put(symbol, Pair.of(i, type));
+    }
     public void addSymbol(String symbol, Type type) {
         if (st.peek().getKey().containsKey(symbol))
             throw new RuntimeException("symbol " + symbol + " already defined!");

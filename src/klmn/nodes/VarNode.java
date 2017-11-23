@@ -5,13 +5,13 @@ import jvm.Opcodes;
 import jvm.classes.FieldInfo;
 import klmn.writing.MethodWriter;
 import klmn.writing.ModuleWriter;
-import klmn.writing.TypeEnv;
+import klmn.writing.types.Type;
 import lang.Token;
 
 public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
 {
     private boolean init, constant = false;
-    private TypeEnv.Type type;
+    private Type type;
 
     public VarNode(Token name, AST modifiers, AST type) { this(name, false, modifiers, type); }
     public VarNode(Token name, AST modifiers, AST type, AST value) { this(name, true, modifiers, type, value); }
@@ -63,7 +63,7 @@ public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
     @Override
     public void write(MethodWriter writer) {
         String name = getValue().getValue();
-        TypeEnv.Type type = ((TypeNode) getChild(1)).get(writer);
+        Type type = ((TypeNode) getChild(1)).get(writer);
 
         writer.getSymbolTable().addSymbol(name, type);
         if (init) writer.getTypeEnv().assignOp(writer, new AST(new Token(name)), (ExpNode) getChild(2));
@@ -90,5 +90,5 @@ public class VarNode extends StmtNode implements ModuleNode.BodyNode, Opcodes
     }
 
     @Override
-    public TypeEnv.Type getType(ModuleWriter writer) { return ((TypeNode) getChild(1)).get(writer); }
+    public Type getType(ModuleWriter writer) { return ((TypeNode) getChild(1)).get(writer); }
 }

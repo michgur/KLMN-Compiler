@@ -6,17 +6,14 @@ import jvm.Opcodes;
 import jvm.methods.Label;
 import klmn.nodes.*;
 import klmn.writing.MethodWriter;
-import klmn.writing.TypeEnv;
+import klmn.writing.types.Type;
 import lang.*;
 import parsing.Parser;
-
-import static klmn.writing.TypeEnv.Type;
 
 public class KLMN implements Opcodes, KGrammar
 {
     // MAIN TODOS:
     //  TODO: NEDDED CLASSES (to make things less messy)
-    //          -Type
     //          -Scope
     //          -Variable (local, module field)
     //          -Method
@@ -46,6 +43,10 @@ public class KLMN implements Opcodes, KGrammar
             c[0].addChild(c[1]);
             return c[0];
         });
+        factory.addProduction(M, new Symbol[] { M, CD }, c -> {
+            c[0].addChild(c[1]);
+            return c[0];
+        });
 
         factory.addProduction(VD, new Symbol[] { MF, T, id }, c -> new VarNode(c[2].getValue(), c[0], c[1]));
         factory.addProduction(VD, new Symbol[] { MF, T, A }, c -> new VarNode(c[2].getChild(0).getValue(), c[0], c[1], c[2].getChild(1)));
@@ -59,8 +60,11 @@ public class KLMN implements Opcodes, KGrammar
         factory.addProduction(FD, new Symbol[] { T, id, openRound, PD, closeRound, openCurly, B, closeCurly },
                 c -> new MethodNode(c[2].getValue(), new AST(new Token("Modifiers")), c[0], c[3], c[6]));
 
-        factory.addProduction(PD0, new Symbol[] { T, id }, c -> new AST(new Token("Params"), new AST(c[1].getValue(), c[0])));
-        factory.addProduction(PD0, new Symbol[] { PD0, comma, T, id}, c -> {
+        factory.addProduction(CD, new Symbol[] { MF, kwClass, id, openCurly, M, closeCurly }, c ->
+                new ClassNode(c[2].getValue().getValue(), c[0], (ModuleNode) c[4]));
+
+        factory.addProduction(PD0, new Symbol[] { T, ID }, c -> new AST(new Token("Params"), new AST(c[1].getValue(), c[0])));
+        factory.addProduction(PD0, new Symbol[] { PD0, comma, T, ID}, c -> {
             c[0].addChild(new AST(c[3].getValue(), c[2]));
             return c[0];
         });
@@ -77,10 +81,19 @@ public class KLMN implements Opcodes, KGrammar
             return c[0];
         });
 
-        factory.addProduction(T, new Symbol[] { id }, c -> new TypeNode(c[0].getValue()));
+        factory.addProduction(T, new Symbol[] { ID }, c -> new TypeNode(c[0].getValue()));
         factory.addProduction(T, new Symbol[] { T, openSquare, closeSquare }, c -> ((TypeNode) c[0]).arrayOfThis());
+        factory.addProduction(T, new Symbol[] { openRound, PT, closeRound, arrow, T }, c -> new TypeNode.FuncTypeNode((TypeNode) c[4], c[1]));
+        factory.addProduction(T, new Symbol[] { openRound, PT0, closeRound }, c -> new TypeNode.TupleTypeNode(c[1]));
+        factory.addProduction(PT, new Symbol[] { }, c -> new AST(new Token("Parameter Types")));
+        factory.addProduction(PT, new Symbol[] { PT0 }, c -> c[0]);
+        factory.addProduction(PT0, new Symbol[] { T }, c -> new AST(new Token("Parameter Types"), c[0]));
+        factory.addProduction(PT0, new Symbol[] { PT0, comma, T }, c -> {
+            c[0].addChild(c[2]);
+            return c[0];
+        });
 
-        factory.addProduction(A, new Symbol[] { id, assign, E }, c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
+        factory.addProduction(A, new Symbol[] { ID, assign, E }, c -> new ExpNode(c[1].getValue(), c[0], c[2]) {
             @Override protected Type typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getValue().getValue()); }
             @Override public void write(MethodWriter writer) {
 
@@ -99,8 +112,16 @@ public class KLMN implements Opcodes, KGrammar
                 writer.pop();
             }
         });
-        factory.addProduction(SE, new Symbol[] { id, openRound, P, closeRound }, c -> new StmtExpNode(new Token("()"), c[0], c[2]) {
-            @Override protected Type typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getValue().getValue()); }
+        factory.addProduction(SE, new Symbol[] { ID, openRound, P, closeRound }, c -> new StmtExpNode(new Token("()"), c[0], c[2]) {
+            @Override protected Type typeCheck(MethodWriter writer) {
+                Type.Function type = (Type.Function) writer.typeOf(getChild(0).getValue().getValue());
+                for (int i = 0; i < getChild(1).getChildren().size(); i++)
+                    if (!((ExpNode) getChild(1).getChild(i)).getType(writer).equals(type.getParams()[i]))
+                        throw new RuntimeException("bad type " + ((ExpNode) getChild(1).getChild(i)).getType(writer).getName() +
+                        ", " + type.getParams()[i].getName() + " expected");
+                // todo: exception for wrong number of params
+                return type.getReturnType();
+            }
             @Override public void writeExp(MethodWriter writer) {
                 String[] params = new String[getChild(1).getChildren().size()];
                 for (int i = 0; i < params.length; i++) {
@@ -109,7 +130,7 @@ public class KLMN implements Opcodes, KGrammar
                     exp.write(writer);
                 }
                 String name = getChild(0).getValue().getValue();
-                writer.callStatic(writer.getParentName(), name, writer.typeOf(name).getDescriptor(), params);
+                writer.callStatic(writer.getParentName(), name, (Type.Function) writer.typeOf(name));
             }
             @Override public void writeStmt(MethodWriter writer) {
                 String[] params = new String[getChild(1).getChildren().size()];
@@ -118,21 +139,27 @@ public class KLMN implements Opcodes, KGrammar
                     params[i] = exp.getType(writer).getDescriptor();
                     exp.write(writer);
                 }
-                String name = getChild(0).getValue().getValue(), type = writer.typeOf(name).getDescriptor();
-                writer.callStatic(writer.getParentName(), name, type, params);
-                if (!type.equals("V")) writer.pop();
+                String name = getChild(0).getValue().getValue();
+                Type.Function type = (Type.Function) writer.typeOf(name);
+                writer.callStatic(writer.getParentName(), name,  type);
+                if (!type.getReturnType().getDescriptor().equals("V")) writer.pop();
             }
         }); // todo: validate parameter types & amount
-        factory.addProduction(SE, new Symbol[] { id, openRound, closeRound }, c -> new StmtExpNode(new Token("()"), c[0]) {
-            @Override protected Type typeCheck(MethodWriter writer) { return writer.typeOf(getChild(0).getValue().getValue()); }
+        factory.addProduction(SE, new Symbol[] { ID, openRound, closeRound }, c -> new StmtExpNode(new Token("()"), c[0]) {
+            @Override protected Type typeCheck(MethodWriter writer) {
+                Type.Function type = (Type.Function) writer.typeOf(getChild(0).getValue().getValue());
+                if (type.getParams().length != 0) throw new RuntimeException("missing parameters");
+                return ((Type.Function) writer.typeOf(getChild(0).getValue().getValue())).getReturnType();
+            }
             @Override public void writeExp(MethodWriter writer) {
                 String name = getChild(0).getValue().getValue();
-                writer.callStatic(writer.getParentName(), name, writer.typeOf(name).getDescriptor());
+                writer.callStatic(writer.getParentName(), name, (Type.Function) writer.typeOf(name));
             }
             @Override public void writeStmt(MethodWriter writer) {
-                String name = getChild(0).getValue().getValue(), type = writer.typeOf(name).getDescriptor();
+                String name = getChild(0).getValue().getValue();
+                Type.Function type = (Type.Function) writer.typeOf(name);
                 writer.callStatic(writer.getParentName(), name, type);
-                if (!type.equals("V")) writer.pop();
+                if (!type.getReturnType().getDescriptor().equals("V")) writer.pop();
             }
         });
         factory.addProduction(SE, new Symbol[] { DI }, c -> c[0]);
@@ -206,6 +233,10 @@ public class KLMN implements Opcodes, KGrammar
             c[0].addChild(c[2]);
             return c[0];
         });
+
+        factory.addProduction(ID, new Symbol[] { id }, c -> c[0]);
+        factory.addProduction(ID, new Symbol[] { ID, dot, id }, c ->
+                new AST(new Token(id, c[0].getValue().getValue() + "." + c[2].getValue().getValue())));
         
         //<editor-fold desc="Expressions">
         factory.addProduction(E, new Symbol[] { T6 }, c -> c[0]);
@@ -412,6 +443,8 @@ public class KLMN implements Opcodes, KGrammar
                 c -> {
             if (c[0] instanceof NumberLiteral && c[2] instanceof NumberLiteral)
                 return new NumberLiteral(((NumberLiteral) c[0]).getFloatValue() + ((NumberLiteral) c[2]).getFloatValue());
+            if (c[0].getValue().getType() == stringL && c[2].getValue().getType() == stringL)
+                return new AST(new Token(stringL, c[0].getValue().getValue() + c[2].getValue().getValue()));
             return new ExpNode(c[1].getValue(), c[0], c[2]) {
                     @Override public Type typeCheck(MethodWriter writer)
                     { return writer.getTypeEnv().binaryOpType(getValue().getType(), getExpChild(0).getType(writer), getExpChild(1).getType(writer)); }
@@ -467,13 +500,11 @@ public class KLMN implements Opcodes, KGrammar
             }
         };});
         factory.addProduction(T1, new Symbol[] { DI }, c -> c[0]);
-        factory.addProduction(DI, new Symbol[] { increment, T0 }, c -> new StmtExpNode(c[0].getValue(), c[1]) {
+        factory.addProduction(DI, new Symbol[] { increment, ID }, c -> new StmtExpNode(c[0].getValue(), c[1]) {
             @Override public Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
             @Override public void writeExp(MethodWriter writer) {
-                if (getChild(0).getValue().getType() != id)
-                    throw new RuntimeException("variable expected!");
                 String name = getChild(0).getValue().getValue();
                 writer.pushVar(name);
                 writer.pushFloat(1);
@@ -482,8 +513,6 @@ public class KLMN implements Opcodes, KGrammar
                 writer.pushVar(name);
             }
             @Override public void writeStmt(MethodWriter writer) {
-                if (getChild(0).getValue().getType() != id)
-                    throw new RuntimeException("variable expected!");
                 String name = getChild(0).getValue().getValue();
                 writer.pushVar(name);
                 writer.pushFloat(1);
@@ -491,13 +520,11 @@ public class KLMN implements Opcodes, KGrammar
                 writer.popToVar(name);
             }
         });
-        factory.addProduction(DI, new Symbol[] { decrement, T0 }, c -> new StmtExpNode(c[0].getValue(), c[1]) {
+        factory.addProduction(DI, new Symbol[] { decrement, ID }, c -> new StmtExpNode(c[0].getValue(), c[1]) {
             @Override public Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
             @Override public void writeExp(MethodWriter writer) {
-                if (getChild(0).getValue().getType() != id)
-                    throw new RuntimeException("variable expected!");
                 String name = getChild(0).getValue().getValue();
                 writer.pushVar(name);
                 writer.pushFloat(1);
@@ -506,8 +533,6 @@ public class KLMN implements Opcodes, KGrammar
                 writer.pushVar(name);
             }
             @Override public void writeStmt(MethodWriter writer) {
-                if (getChild(0).getValue().getType() != id)
-                    throw new RuntimeException("variable expected!");
                 String name = getChild(0).getValue().getValue();
                 writer.pushVar(name);
                 writer.pushFloat(1);
@@ -515,13 +540,11 @@ public class KLMN implements Opcodes, KGrammar
                 writer.popToVar(name);
             }
         });
-        factory.addProduction(DI, new Symbol[] { T0, increment }, c -> new StmtExpNode(c[1].getValue(), c[0]) {
+        factory.addProduction(DI, new Symbol[] { ID, increment }, c -> new StmtExpNode(c[1].getValue(), c[0]) {
             @Override public Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
             @Override public void writeExp(MethodWriter writer) {
-                if (getChild(0).getValue().getType() != id)
-                    throw new RuntimeException("variable expected!");
                 String name = getChild(0).getValue().getValue();
                 writer.pushVar(name);
                 writer.pushVar(name);
@@ -530,8 +553,6 @@ public class KLMN implements Opcodes, KGrammar
                 writer.popToVar(name);
             }
             @Override public void writeStmt(MethodWriter writer) {
-                if (getChild(0).getValue().getType() != id)
-                    throw new RuntimeException("variable expected!");
                 String name = getChild(0).getValue().getValue();
                 writer.pushVar(name);
                 writer.pushFloat(1);
@@ -539,13 +560,11 @@ public class KLMN implements Opcodes, KGrammar
                 writer.popToVar(name);
             }
         });
-        factory.addProduction(DI, new Symbol[] { T0, decrement }, c -> new StmtExpNode(c[1].getValue(), c[0]) {
+        factory.addProduction(DI, new Symbol[] { ID, decrement }, c -> new StmtExpNode(c[1].getValue(), c[0]) {
             @Override public Type typeCheck(MethodWriter writer) {
                 return getExpChild(0).getType(writer); // todo: something better
             }
             @Override public void writeExp(MethodWriter writer) {
-                if (getChild(0).getValue().getType() != id)
-                    throw new RuntimeException("variable expected!");
                 String name = getChild(0).getValue().getValue();
                 writer.pushVar(name);
                 writer.dup(writer.getTypeEnv().getForDescriptor("I"));
@@ -554,8 +573,6 @@ public class KLMN implements Opcodes, KGrammar
                 writer.popToVar(name);
             }
             @Override public void writeStmt(MethodWriter writer) {
-                if (getChild(0).getValue().getType() != id)
-                    throw new RuntimeException("variable expected!");
                 String name = getChild(0).getValue().getValue();
                 writer.pushVar(name);
                 writer.pushFloat(1);
@@ -569,7 +586,7 @@ public class KLMN implements Opcodes, KGrammar
             @Override public Type typeCheck(MethodWriter writer) { return writer.getTypeEnv().getForName("<stringL>"); }
             @Override public void write(MethodWriter writer) { writer.pushString(getValue().getValue().substring(2)); }
         });
-        factory.addProduction(T0, new Symbol[] { id }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
+        factory.addProduction(T0, new Symbol[] { ID }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
             @Override public Type typeCheck(MethodWriter writer) { return writer.typeOf(getValue().getValue()); }
             @Override public void write(MethodWriter writer) { writer.pushVar(getValue().getValue()); }
         });
@@ -590,6 +607,18 @@ public class KLMN implements Opcodes, KGrammar
         factory.addProduction(T0, new Symbol[] { SE }, c -> new ExpNode(c[0].getValue(), c[0].getChildren()) {
             @Override protected Type typeCheck(MethodWriter writer) { return ((StmtExpNode) c[0]).getType(writer); }
             @Override public void write(MethodWriter writer) { ((StmtExpNode) c[0]).writeExp(writer); }
+        });
+        factory.addProduction(T0, new Symbol[] {openRound, P, closeRound}, c -> new ExpNode(new Token("Tuple"), c[1].getChildren()) {
+            @Override protected Type typeCheck(MethodWriter writer) {
+                Type[] types = new Type[getChildren().size()];
+                for (int i = 0; i < types.length; i++)
+                    types[i] = ((ExpNode) getChild(i)).getType(writer);
+                return new Type.Tuple(types);
+            }
+            @Override public void write(MethodWriter writer) {
+                for (AST c : getChildren())
+                    ((ExpNode) c).write(writer);
+            }
         });
         //</editor-fold>
     }

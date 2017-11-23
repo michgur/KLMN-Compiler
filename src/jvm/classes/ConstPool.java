@@ -26,6 +26,16 @@ public class ConstPool implements Opcodes
     public static final byte CONSTANT_MethodType	        = 16;
     public static final byte CONSTANT_InvokeDynamic         = 18;
     
+    public static final byte REF_getField = 1;
+    public static final byte REF_getStatic = 2;
+    public static final byte REF_putField = 3;
+    public static final byte REF_putStatic = 4;
+    public static final byte REF_invokeVirtual = 5;
+    public static final byte REF_invokeStatic = 6;
+    public static final byte REF_invokeSpecial = 7;
+    public static final byte REF_newInvokeSpecial = 8;
+    public static final byte REF_invokeInterface = 9;
+    
     private Set<ConstInfo> consts = new LinkedHashSet<>();
     private short count = 1;
 

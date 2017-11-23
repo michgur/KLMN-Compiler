@@ -1,11 +1,10 @@
-package klmn.writing;
+package klmn.writing.types;
 
 import ast.AST;
 import jvm.Opcodes;
 import jvm.methods.Label;
-import klmn.nodes.BoolExpNode;
 import klmn.nodes.ExpNode;
-import klmn.nodes.NumberLiteral;
+import klmn.writing.MethodWriter;
 import lang.Terminal;
 import util.Pair;
 
@@ -26,22 +25,20 @@ public class TypeEnv implements Opcodes
     public Type getForName(String name) { return getForName(name, 0); }
     public Type getForName(String name, int dim) {
         for (Type t : types) {
-            if (!t.name.equals(name) || t.dim > dim) continue;
-            if (t.dim == dim) return t;
-            Type a = new Type(t.name,
-                    String.join("", Collections.nCopies(dim - t.dim, "[")) + t.desc, dim);
+            if (!t.getName().equals(name) || t.getDimensions() > dim) continue;
+            if (t.getDimensions() == dim) return t;
+            Type a = new Type(t.getName(),
+                    String.join("", Collections.nCopies(dim - t.getDimensions(), "[")) + t.getDescriptor(), dim);
             types.add(a);
             return a;
         }
-        throw new RuntimeException("No defined type with name " + name);
+        return add(name, 'L' + name.replace('.', '/') + ';');
+//        throw new RuntimeException("No defined type with name " + name);
     }
     public Type getForDescriptor(String desc) {
-        for (Type t : types) if (t.desc.equals(desc)) return t;
+        for (Type t : types) if (t.getDescriptor().equals(desc)) return t;
         throw new RuntimeException("No defined type with descriptor " + desc);
     }
-
-    public String getName(String desc) { return getForDescriptor(desc).name; }
-    public String getDescriptor(String name) { return getForName(name).desc; }
 
     { // does not belong here
         Type i = add("int", "I");
@@ -52,12 +49,12 @@ public class TypeEnv implements Opcodes
         Type bool = add("boolean", "Z");
         add("void", "V");
         Type sl = add("<stringL>", "Ljava/lang/String;"); // only for literals
-        Type sla = add("<stringL[]>", "[Ljava/lang/String;"); // only for main args
+        add("<stringL[]>", "[Ljava/lang/String;"); // only for main args
 
         binaryOps = new HashMap<>();
         binaryCondOps = new HashMap<>();
         assignOps = new HashMap<>();
-        
+
         putOp(plus, i, i, new OpSame(IADD), i);
         putOp(plus, f, f, new OpSame(FADD), f);
         putOp(plus, i, f, new OpIF(FADD), f);
@@ -74,15 +71,15 @@ public class TypeEnv implements Opcodes
         putOp(divide, f, f, new OpSame(FDIV), f);
         putOp(divide, i, f, new OpIF(FDIV), f);
         putOp(divide, f, i, new OpFI(FDIV), f);
-        putOpAssign(i, f, (writer, a, b) -> {
+        putAssignOp(i, f, (writer, a, b) -> {
             f2i(writer, b);
             writer.popToVar(a.getValue().getValue());
         });
-        putOpAssign(f, i, (writer, a, b) -> {
+        putAssignOp(f, i, (writer, a, b) -> {
             i2f(writer, b);
             writer.popToVar(a.getValue().getValue());
         });
-        putOpAssign(s, sl, (writer, a, b) -> {
+        putAssignOp(s, sl, (writer, a, b) -> {
             createString(writer, b);
             writer.popToVar(a.getValue().getValue());
         });
@@ -213,6 +210,7 @@ public class TypeEnv implements Opcodes
     private Map<Pair<Type, Type>, AssignOperator> assignOps;
 
     public interface AssignOperator { void op(MethodWriter writer, AST a, ExpNode b); }
+    public interface PrintOperator { void op(MethodWriter writer, ExpNode a, boolean ln); }
     public interface BinaryOperator { void op(MethodWriter writer, ExpNode a, ExpNode b); }
     // todo: something scope-based (for op overloading)
     // todo: exception for undefined operators
@@ -226,7 +224,7 @@ public class TypeEnv implements Opcodes
         binaryOps.putIfAbsent(op, new HashMap<>());
         binaryOps.get(op).put(Pair.of(a, b), Pair.of(code, res));
     }
-    private void putOpAssign(Type a, Type b, AssignOperator op) { assignOps.put(Pair.of(a, b), op); }
+    private void putAssignOp(Type a, Type b, AssignOperator op) { assignOps.put(Pair.of(a, b), op); }
 
     public void binaryOp(MethodWriter writer, Terminal op, ExpNode a, ExpNode b) {
         Type ta = a.getType(writer), tb = b.getType(writer);
@@ -244,7 +242,7 @@ public class TypeEnv implements Opcodes
     public void assignOp(MethodWriter writer, AST a, ExpNode b) {
         Type ta = writer.typeOf(a.getValue().getValue()), tb = b.getType(writer);
         if (assignOps.get(Pair.of(ta, tb)) == null) {
-            if (! ta.equals(tb))
+            if (!ta.equals(tb))
                 throw new RuntimeException("no = operator defined for types " + ta.getName() + ", " + tb.getName());
             b.write(writer);
             writer.popToVar(a.getValue().getValue());
@@ -258,35 +256,5 @@ public class TypeEnv implements Opcodes
         if (code == null)
             throw new RuntimeException("no " + op + " operator defined for types " + ta.getName() + ", " + tb.getName());
         code.op(writer, a, b);
-    }
-
-    public static class Type
-    {
-        private String desc, name;
-        private int dim; // -ensions
-        private Type(String name, String desc) { this(name, desc, 0); }
-        private Type(String name, String desc, int dim) {
-            this.name = name;
-            this.desc = desc;
-            this.dim = dim;
-        }
-
-        public String getName() { return name; }
-        public String getDescriptor() { return desc; }
-
-        public boolean isArray() { return dim > 0; }
-        public int getDimensions() { return dim; }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            Type type = (Type) o;
-            return dim == type.dim && desc.equals(type.desc) && name.equals(type.name);
-        }
-
-        @Override
-        public int hashCode() { return 31 * (31 * desc.hashCode() + name.hashCode()) + dim; }
     }
 }

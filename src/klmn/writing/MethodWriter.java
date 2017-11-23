@@ -1,11 +1,14 @@
 package klmn.writing;
 
+import ast.AST;
 import jvm.Opcodes;
 import jvm.classes.ConstPool;
 import jvm.methods.Code;
 import jvm.methods.Label;
 import jvm.methods.MethodInfo;
 import klmn.nodes.ExpNode;
+import klmn.writing.types.Type;
+import klmn.writing.types.TypeEnv;
 
 public class MethodWriter implements Opcodes
 {
@@ -35,7 +38,7 @@ public class MethodWriter implements Opcodes
     }
 
     public int findSymbol(String symbol) { return st.findSymbol(symbol); }
-    public TypeEnv.Type typeOf(String symbol) { return st.typeOf(symbol); }
+    public Type typeOf(String symbol) { return st.typeOf(symbol); }
     public boolean checkScope(String symbol) { return st.checkScope(symbol); }
 
     public void enterScope() { enterScope(SymbolTable.ScopeType.BLOCK); }
@@ -81,12 +84,21 @@ public class MethodWriter implements Opcodes
         code.invoke(INVOKEVIRTUAL, constPool.addMethodref(cls, method,
             '(' + String.join("", params) + ')' + type), type, params.length, false);
     }
-    public void callStatic(String cls, String method, String type, String... params) {
-        code.invoke(INVOKESTATIC, constPool.addMethodref(cls, method,
-                '(' + String.join("", params) + ')' + type), type, params.length, true);
+    public void call(String cls, String method, Type.Function type) {
+        code.invoke(INVOKEVIRTUAL, constPool.addMethodref(cls, method,
+                type.getDescriptor()), type.getReturnType().getDescriptor(), type.getParams().length, false);
     }
-    public void dup(TypeEnv.Type type) { code.push(DUP, type.getDescriptor()); }
+    public void callStatic(String cls, String method, Type.Function type) {
+        code.invoke(INVOKESTATIC, constPool.addMethodref(cls, method,
+                type.getDescriptor()), type.getReturnType().getDescriptor(), type.getParams().length, true);
+    }
+    public void dup(Type type) { code.push(DUP, type.getDescriptor()); }
     public void pushVar(String name) {
+        if (st.typeOf(name) instanceof Type.Tuple) {
+            for (int i = ((Type.Tuple) st.typeOf(name)).getTypes().length - 1; i >= 0; i--)
+                pushVar(name + "#" + i);
+            return;
+        }
         int index = st.findSymbol(name);
         String desc = st.typeOf(name).getDescriptor();
         switch (st.scopeTypeOf(name)) {
@@ -111,6 +123,11 @@ public class MethodWriter implements Opcodes
     }
     public void pop() { code.pop(POP); }
     public void popToVar(String name) {
+        if (st.typeOf(name) instanceof Type.Tuple) {
+            for (int i = ((Type.Tuple) st.typeOf(name)).getTypes().length - 1; i >= 0; i--)
+                popToVar(name + "#" + i);
+            return;
+        }
         int i = findSymbol(name);
         String desc = st.typeOf(name).getDescriptor();
         switch (st.scopeTypeOf(name)) {
@@ -137,8 +154,40 @@ public class MethodWriter implements Opcodes
     public void useJmpOperator(byte opcode, Label target)
     { code.jmpOperator(opcode, getOperandsAmount(opcode), target); }
 
-    public void print(ExpNode exp) { // todo: use dup for printing without getstatic per print
+    private void createTupleString(ExpNode exp, Type.Tuple type) {
+        pushNew("java/lang/StringBuilder");
+        init("java/lang/StringBuilder");
+        code.push(BIPUSH, (byte) ('(' & 0xFF), "C");
+        call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", "C");
+        for (int i = 0; i < type.getTypes().length; i++) {
+            if (type.getTypes()[i] instanceof Type.Tuple) {
+                createTupleString((ExpNode) exp.getChild(i), (Type.Tuple) type.getTypes()[i]);
+                call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", "Ljava/lang/String;");
+            } else {
+                ((ExpNode) exp.getChild(i)).write(this);
+                String t = type.getTypes()[i].getDescriptor();
+                call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", (t.startsWith("L")) ? "Ljava/lang/Object;" : t);
+            }
+            if (i != type.getTypes().length - 1) {
+                pushString(", ");
+                call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", "Ljava/lang/String;");
+            } else {
+                code.push(BIPUSH, (byte) (')' & 0xFF), "C");
+                call("java/lang/StringBuilder", "append", "Ljava/lang/StringBuilder;", "C");
+            }
+        }
+        call("java/lang/StringBuilder", "toString", "Ljava/lang/String;");
+    }
+    public void print(ExpNode exp) {
         pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
+        if (exp.getType(this) instanceof Type.Tuple) {
+            createTupleString(exp, (Type.Tuple) exp.getType(this));
+            call("java/io/PrintStream", "print", "V", "Ljava/lang/String;");
+            pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
+            pushString(" ");
+            call("java/io/PrintStream", "print", "V", "Ljava/lang/String;");
+            return;
+        }
         exp.write(this);
         String type = exp.getType(this).getDescriptor();
         switch (type) {
@@ -162,6 +211,11 @@ public class MethodWriter implements Opcodes
     }
     public void println(ExpNode exp) {
         pushStaticField("java/lang/System", "out", "Ljava/io/PrintStream;");
+        if (exp.getType(this) instanceof Type.Tuple) {
+            createTupleString(exp, (Type.Tuple) exp.getType(this));
+            call("java/io/PrintStream", "println", "V", "Ljava/lang/String;");
+            return;
+        }
         exp.write(this);
         String type = exp.getType(this).getDescriptor();
         switch (type) {

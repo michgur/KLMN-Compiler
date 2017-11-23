@@ -2,7 +2,7 @@ package klmn.nodes;
 
 import klmn.KGrammar;
 import klmn.writing.MethodWriter;
-import klmn.writing.TypeEnv;
+import klmn.writing.types.Type;
 import lang.Token;
 
 public class NumberLiteral extends ExpNode
@@ -18,12 +18,12 @@ public class NumberLiteral extends ExpNode
     }
     public NumberLiteral(float value) {
         super(new Token(KGrammar.numberL, Float.toString(value)));
-        isInteger = value == (int) value;
+//        isInteger = value == (int) value; currently disables because float parameters
         this.value = value;
     }
 
     @Override
-    protected TypeEnv.Type typeCheck(MethodWriter writer) {
+    protected Type typeCheck(MethodWriter writer) {
         return isInteger ? writer.getTypeEnv().getForDescriptor("I")
                 : writer.getTypeEnv().getForDescriptor("F");
     }

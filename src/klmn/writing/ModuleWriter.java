@@ -2,6 +2,7 @@ package klmn.writing;
 
 import jvm.Opcodes;
 import klmn.nodes.ModuleNode;
+import klmn.writing.types.TypeEnv;
 
 public class ModuleWriter implements Opcodes
 {

@@ -17,6 +17,7 @@ public class Code extends AttributeInfo implements Opcodes
     Code(ClassFile cls, MethodInfo method) {
         super(cls, "Code");
         smt = new StackMapTable(cls, method.getParams());
+        attributes.add(smt);
     }
 
     public void addAttribute(AttributeInfo attribute) { attributes.add(attribute); }
@@ -99,12 +100,8 @@ public class Code extends AttributeInfo implements Opcodes
         return label;
     }
 
-    public int getSize() { return code.size(); }
-
     @Override
     public ByteList toByteList() {
-        if (smt.getSize() != 0) attributes.add(smt);
-
         for (Label frame : frames.keySet())
             for (int pair : frames.get(frame)) {
                 int offset = frame.block.getOffset() - pair + 1;
@@ -112,15 +109,14 @@ public class Code extends AttributeInfo implements Opcodes
                 code.set(pair + 1, (byte) (offset & 0xFF));
             }
 
-        info.addShort(smt.getMaxStack());     // max_stack
-        info.addShort(smt.getMaxLocals());    // max_locals
-        info.addInt(code.size());             // code_length
-        info.addAll(code);                    // code[code_length]
-        info.addShort(0x0000);              // exception_table_length
-        info.addShort(attributes.size());     // attributes_count
-        for (AttributeInfo attrib : attributes)
-            info.addAll(attrib.toByteList()); // attributes[attributes_count]
-//        info.addShort(0);
+        info.addShort(smt.getMaxStack());       // max_stack
+        info.addShort(smt.getMaxLocals());      // max_locals
+        info.addInt(code.size());               // code_length
+        info.addAll(code);                      // code[code_length]
+        info.addShort(0x0000);               // exception_table_length
+        info.addShort(attributes.size());       // attributes_count
+        for (AttributeInfo attrib : attributes) if (attrib.include())
+            info.addAll(attrib.toByteList());   // attributes[attributes_count]
 
         return super.toByteList();
     }

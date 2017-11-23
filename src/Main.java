@@ -1,9 +1,11 @@
 import jvm.Opcodes;
 import klmn.KLMN;
 
+import java.lang.invoke.StringConcatFactory;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * ಠ^ಠ.
@@ -23,7 +25,7 @@ public class Main implements Opcodes
             Classes- only add these after the previous 2 are working
 
         Tuples Implementation:
-            -can implement as a generic linked list (problem: type information is required per instance)
+            -can implement as a generic linked list (problem: type information is required per instance) // Maybe That's not true
             -can implement as a struct (static type info)
                 (problem: a special struct has to be created for each different kind of tuple)
             I think the second solution is better for our purpose, since usually there will be more than
@@ -39,8 +41,8 @@ public class Main implements Opcodes
      */
 
     /* 💩💩💩 AMAZING 💩💩💩 */
-    public static void main(String[] args) {
-        try {String src = String.join("\n", Files.readAllLines(Paths.get(args[0])));
-        KLMN.compile("TEMP", src);}catch (Exception e) {e.printStackTrace();}
+    public static void main(String[] args) throws Exception {
+        String src = String.join("\n", Files.readAllLines(Paths.get(args[0])));
+        KLMN.compile("TEMP", src);
     }
 }

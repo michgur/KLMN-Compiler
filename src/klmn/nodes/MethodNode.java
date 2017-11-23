@@ -6,8 +6,8 @@ import jvm.classes.ClassFile;
 import jvm.methods.MethodInfo;
 import klmn.writing.MethodWriter;
 import klmn.writing.ModuleWriter;
-import klmn.writing.SymbolTable;
-import klmn.writing.TypeEnv;
+import klmn.writing.types.Type;
+import klmn.writing.types.TypeEnv;
 import lang.Token;
 
 public class MethodNode extends AST implements ModuleNode.BodyNode, Opcodes
@@ -40,7 +40,7 @@ public class MethodNode extends AST implements ModuleNode.BodyNode, Opcodes
         }
         String moduleName = writer.getModule().getValue().getValue();
 
-        String type = ((TypeNode) getChild(1)).get(writer).getDescriptor();
+        String type = (((TypeNode) getChild(1)).get(writer)).getDescriptor();
         if (getValue().getValue().equals("main") && type.equals("V")
                 && params.length == 1 && params[0].equals("[Ljava/lang/StringBuilder;"))
             params[0] = "[Ljava/lang/String;";  // todo- something safer (actually make args[] a java.lang.String array)
@@ -56,7 +56,12 @@ public class MethodNode extends AST implements ModuleNode.BodyNode, Opcodes
     }
 
     @Override
-    public TypeEnv.Type getType(ModuleWriter writer) { return ((TypeNode) getChild(1)).get(writer); }
+    public Type getType(ModuleWriter writer) {
+        Type[] params = new Type[getChild(2).getChildren().size()];
+        for (int i = 0; i < params.length; i++)
+            params[i] = ((TypeNode) getChild(2).getChild(i).getChild(0)).get(writer);
+        return new Type.Function(((TypeNode) getChild(1)).get(writer), params);
+    }
 
     public interface BodyNode { void write(MethodWriter writer); }
 }

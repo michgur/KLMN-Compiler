@@ -5,11 +5,10 @@ import jvm.Opcodes;
 import jvm.classes.ClassFile;
 import jvm.methods.MethodInfo;
 import klmn.writing.ModuleWriter;
-import klmn.writing.TypeEnv;
+import klmn.writing.types.Type;
+import klmn.writing.types.TypeEnv;
 import lang.Token;
 import klmn.writing.MethodWriter;
-
-import java.util.List;
 
 public class ModuleNode extends AST implements Opcodes
 {
@@ -26,7 +25,7 @@ public class ModuleNode extends AST implements Opcodes
 
     public void run() {
         // order of operations: first, save all symbols, then write methods, then compute vars in order
-        for (AST c : getChildren()) // first pass, write symbols
+        for (AST c : getChildren())
             writer.getSymbolTable().addSymbol(c.getValue().getValue(), ((BodyNode) c).getType(writer));
         for (AST c : getChildren()) ((BodyNode) c).write(writer);
 
@@ -40,6 +39,6 @@ public class ModuleNode extends AST implements Opcodes
 
     public interface BodyNode {
         void write(ModuleWriter writer);
-        TypeEnv.Type getType(ModuleWriter writer);
+        Type getType(ModuleWriter writer);
     }
 }
