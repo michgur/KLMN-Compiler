@@ -1,3 +1,16 @@
-for (var i = 5; i < 10; i++)
-    for (var j = 0; j < 5; j++)
-        print i;
+var[] array = { 100, 234, 2432, 967, 121, 326, 12, 87 };
+var sorted = 0;
+
+# bubble sort
+while (sorted == 0) {
+    sorted = 1;
+    for (var i = 0; i < length(array) - 1; i++) {
+        if (array[i] > array[i + 1]) {
+            var temp = array[i];
+            array[i] = array[i+1];
+            array[i + 1] = temp;
+            sorted = 0;
+        }
+    }
+}
+for (var i = 0; i < length(array); i++) print array[i];

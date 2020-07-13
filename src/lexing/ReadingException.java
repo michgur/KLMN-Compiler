@@ -1,4 +1,4 @@
-package lang;
+package lexing;
 
 /**
  * ಠ^ಠ.

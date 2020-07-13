@@ -1,4 +1,4 @@
-package lang;
+package lexing;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,11 +10,9 @@ import java.util.Set;
  * Created by Michael on 8/15/2017.
  *
  * This Class Manages A Grammar & Its Tokens
- * TODO: remove this silly little class, let user implement Tokenizer manually & more efficiently
  */
 public class Language
 {
-    private Grammar grammar;
     // data for tokenizing code
     Map<Character, Terminal> operators = new HashMap<>();
     Map<String, Terminal> keywords = new HashMap<>();
@@ -39,8 +37,6 @@ public class Language
         ignored.add(tokenizer);
         return this;
     }
-
-    public void createGrammar(Symbol s) { grammar = new Grammar(s); }
 
     public TokenStream tokenize(String src) { return new TokenStream(this, src); }
 }

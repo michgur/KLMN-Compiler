@@ -1,6 +1,6 @@
 package parsing;
 
-import lang.Token;
+import lexing.Token;
 
 /**
  * ಠ^ಠ.

@@ -1,12 +1,8 @@
 package parsing;
 
-import ast.AST;
-import ast.ASTFactory;
 import automata.DFA;
 import automata.NFA;
-import javafx.util.Pair;
-import jdk.internal.org.objectweb.asm.MethodVisitor;
-import lang.*;
+import lexing.*;
 
 import java.util.*;
 
@@ -18,7 +14,7 @@ public class Parser // SLR(1) Parser
 {
     private Grammar grammar;
     private DFA<Item, Symbol> dfa;
-    private Map<Pair<Integer, Terminal>, Action> action;
+    private Map<Map.Entry<Integer, Terminal>, Action> action;
 
     public Parser(Grammar grammar) {
         this.grammar = grammar;
@@ -34,24 +30,23 @@ public class Parser // SLR(1) Parser
         action = Action.generateActionMap(grammar, dfa);
     }
 
-    public AST parse(TokenStream input, ASTFactory factory) {
-        Stack<Pair<AST, Integer>> stack = new Stack<>();
-        stack.push(new Pair<>(null, 0));
+    public AST parse(TokenStream input) {
+        Stack<Map.Entry<AST, Integer>> stack = new Stack<>();
+        stack.push(new AbstractMap.SimpleEntry<>(null, 0));
 
         while (true) {
-            Action a = action.get(new Pair<>(stack.peek().getValue(), grammar.getTerminal(input.peek())));
+            Action a = action.get(new AbstractMap.SimpleEntry<>(stack.peek().getValue(), grammar.getTerminal(input.peek())));
             switch (a.type) {
                 case SHIFT:
-                    stack.push(new Pair<>(new AST(input.peek()) {
-                        @Override public void apply(MethodVisitor mv) {}
+                    stack.push(new AbstractMap.SimpleEntry<>(new AST(input.peek()) {
                     }, a.state));
                     input.next();
                     break;
                 case REDUCE:
                     AST[] p = new AST[a.item.index];
                     for (int i = p.length - 1; i >= 0; i--) p[i] = stack.pop().getKey();
-                    stack.push(new Pair<>(factory.generate(a.item.key, a.item.value, p),
-                            dfa.getTransition(stack.peek().getValue(), a.item.key)));
+                    stack.push(new AbstractMap.SimpleEntry<>(new AST(a.item.key, p) {
+                    }, dfa.getTransition(stack.peek().getValue(), a.item.key)));
                     break;
                 case ACCEPT: return stack.get(1).getKey();
                 case ERROR: throw new ParsingException(input.peek());

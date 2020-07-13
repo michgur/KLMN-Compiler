@@ -1,9 +1,6 @@
-package test;
+package codegen;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * ಠ^ಠ.

@@ -1,6 +1,6 @@
 package parsing;
 
-import lang.Symbol;
+import lexing.Symbol;
 
 import java.util.Arrays;
 

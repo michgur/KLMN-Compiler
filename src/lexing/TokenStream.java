@@ -1,4 +1,4 @@
-package lang;
+package lexing;
 
 import java.util.*;
 import java.util.function.Consumer;

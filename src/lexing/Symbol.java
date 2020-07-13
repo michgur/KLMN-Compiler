@@ -1,4 +1,4 @@
-package lang;
+package lexing;
 
 import java.util.HashSet;
 import java.util.Set;

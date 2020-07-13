@@ -1,7 +1,7 @@
-package ast;
+package parsing;
 
-import jdk.internal.org.objectweb.asm.MethodVisitor;
-import lang.Token;
+import lexing.Symbol;
+import lexing.Token;
 
 /**
  * ಠ^ಠ.
@@ -9,18 +9,25 @@ import lang.Token;
  */
 public abstract class AST
 {
-    private Token value;
+    private Symbol value;
+    private String text;
     private AST[] children;
 
-    public AST(Token value, AST... children) {
+    public AST(Symbol value, AST... children) {
         this.value = value;
         this.children = children;
     }
+    public AST(Token token) {
+        this.value = token.getType();
+        this.text = token.getValue();
+        this.children = new AST[0];
+    }
 
-    public abstract void apply(MethodVisitor mv);
-
-    public Token getValue() { return value; }
+    public Symbol getValue() { return value; }
     public AST[] getChildren() { return children; }
+
+    public boolean isLeaf() { return children.length == 0; }
+    public String getText() { return text; }
 
     @Override
     public String toString() {
@@ -29,8 +36,7 @@ public abstract class AST
         return s.toString().substring(0, s.lastIndexOf("\n", s.lastIndexOf("\n") - 1));
     }
     private void toString(StringBuilder s, String prefix, boolean last) {
-        if (value == null) s.append(prefix).append((last) ? "\\-[]\n" : "|-[]\n");
-        else s.append(prefix).append((last) ? "\\-[" : "|-[").append(value.getValue()).append("]\n");
+        s.append(prefix).append((last) ? "\\-[" : "|-[").append(isLeaf() ? text : (value != null ? value.toString() : "")).append("]\n");
         prefix += (last) ? "  " : "| ";
         if (children.length == 0) {
             if (last) s.append(prefix).append('\n');

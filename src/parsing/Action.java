@@ -1,11 +1,11 @@
 package parsing;
 
 import automata.DFA;
-import javafx.util.Pair;
-import lang.Grammar;
-import lang.Symbol;
-import lang.Terminal;
+import lexing.Grammar;
+import lexing.Symbol;
+import lexing.Terminal;
 
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,11 +26,11 @@ class Action // SLR(1) Action
     private Action(Type type, int state) { this(type); this.state = state; }
 
     // in case of shift/ reduce conflicts, we choose to shift
-    public static Map<Pair<Integer, Terminal>, Action> generateActionMap(Grammar grammar, DFA<Item, Symbol> dfa) {
-        Map<Pair<Integer, Terminal>, Action> action = new HashMap<>();
+    public static Map<Map.Entry<Integer, Terminal>, Action> generateActionMap(Grammar grammar, DFA<Item, Symbol> dfa) {
+        Map<Map.Entry<Integer, Terminal>, Action> action = new HashMap<>();
         for (Terminal t : grammar.terminals()) {
             for (int i = 0; i < dfa.size(); i++) {
-                Pair<Integer, Terminal> pair = new Pair<>(i, t);
+                Map.Entry<Integer, Terminal> pair = new AbstractMap.SimpleEntry<>(i, t);
                 for (Item item : dfa.getState(i)) {
                     if (!item.canReduce() && t == item.value[item.index]) {
                         action.put(pair, new Action(Type.SHIFT, dfa.getTransition(i, t)));

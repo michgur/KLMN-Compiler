@@ -59,7 +59,7 @@ public class NFA<S, I>
             }
             states = next;
         }
-        // some paths of the test might have consumed all of the input
+        // some paths of the klmn might have consumed all of the input
         // but didn't reach the final state, so states.size() might be bigger than 1.
         // we only care about the final state
         boolean accept = false;
