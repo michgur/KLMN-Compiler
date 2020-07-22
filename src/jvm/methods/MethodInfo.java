@@ -1,6 +1,7 @@
 package jvm.methods;
 
 import jvm.AttributeInfo;
+import jvm.JVMType;
 import jvm.Opcodes;
 import jvm.classes.ClassFile;
 import util.ByteList;
@@ -13,14 +14,14 @@ public class MethodInfo implements Opcodes
     private short accFlags;
     private short nameIndex, descriptorIndex;
     private List<AttributeInfo> attributes = new ArrayList<>();
-    private String[] params;
+    private JVMType[] params;
 
-    public MethodInfo(ClassFile cls, String name, int accFlags, String type, String... params) {
+    public MethodInfo(ClassFile cls, String name, int accFlags, JVMType type, JVMType... params) {
         this.accFlags = (short) accFlags;
         this.params = params;
 
         nameIndex = cls.getConstPool().addUtf8(name);
-        descriptorIndex = cls.getConstPool().addUtf8('(' + String.join("", params) + ')' + type);
+        descriptorIndex = cls.getConstPool().addUtf8(JVMType.methodDescriptor(type, params));
 
         addAttribute(new Code(cls, this));
 
@@ -42,5 +43,5 @@ public class MethodInfo implements Opcodes
 
     public void addAttribute(AttributeInfo attribute) { attributes.add(attribute); }
 
-    public String[] getParams() { return params; }
+    public JVMType[] getParams() { return params; }
 }

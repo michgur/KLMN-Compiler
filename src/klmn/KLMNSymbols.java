@@ -23,8 +23,8 @@ public interface KLMNSymbols
     Terminal GT = new Terminal(">");
     Terminal LTEQUALS = new Terminal("<=");
     Terminal GTEQUALS = new Terminal(">=");
-    Terminal CURLY_OPEN = new Terminal("+");
-    Terminal CURLY_CLOSE = new Terminal("+");
+    Terminal CURLY_OPEN = new Terminal("{");
+    Terminal CURLY_CLOSE = new Terminal("}");
     Terminal LOGICAL_AND = new Terminal("&&");
     Terminal LOGICAL_OR = new Terminal("||");
     Terminal ASSIGN = new Terminal("=");
@@ -40,6 +40,14 @@ public interface KLMNSymbols
     Terminal KW_FALSE = new Terminal("false");
     Terminal KW_LENGTH = new Terminal("length");
     Terminal COMMA = new Terminal(",");
+    Symbol MODULE = new Symbol("MDL");
+    Symbol MODULE_COMPONENTS = new Symbol("MDL_COMPONENTS");
+    Symbol VAR_DECL = new Symbol("VAR_DECL");
+    Symbol CLS_DECL = new Symbol("CLS_DECL");
+    Symbol FUNC_DECL = new Symbol("FUNC_DECL");
+    Symbol TYPE = new Symbol("TYPE");
+    Symbol PARAMS_DECL = new Symbol("PARAMS_DECL");
+    Symbol PARAMS_DECL_NON_ZERO = new Symbol("PARAMS_DECL_NOT_EMPTY");
     Symbol BLOCK = new Symbol("BLCK");
     Symbol STATEMENT = new Symbol("STMT");
     Symbol ASSIGNMENT = new Symbol(":=");
@@ -58,6 +66,26 @@ public interface KLMNSymbols
 
     Symbol ROOT = new Symbol("ROOT") {
         {
+            MODULE.addProduction(MODULE_COMPONENTS);
+
+            MODULE_COMPONENTS.addProduction();
+            MODULE_COMPONENTS.addProduction(MODULE_COMPONENTS, VAR_DECL, SEMICOLON);
+            // MODULE_COMPONENTS.addProduction(MODULE_COMPONENTS, CLS_DECL);
+            MODULE_COMPONENTS.addProduction(MODULE_COMPONENTS, FUNC_DECL);
+
+            VAR_DECL.addProduction(TYPE, IDENTIFIER);
+            VAR_DECL.addProduction(TYPE, IDENTIFIER, ASSIGN, EXPRESSION);
+
+            FUNC_DECL.addProduction(TYPE, IDENTIFIER, ROUND_OPEN, PARAMS_DECL, ROUND_CLOSE, CURLY_OPEN, BLOCK, CURLY_CLOSE);
+
+            TYPE.addProduction(IDENTIFIER);
+            TYPE.addProduction(TYPE, SQUARE_OPEN, SQUARE_CLOSE);
+
+            PARAMS_DECL_NON_ZERO.addProduction(TYPE, IDENTIFIER);
+            PARAMS_DECL_NON_ZERO.addProduction(PARAMS_DECL_NON_ZERO, COMMA, TYPE, IDENTIFIER);
+            PARAMS_DECL.addProduction(PARAMS_DECL_NON_ZERO);
+            PARAMS_DECL.addProduction();
+
             BLOCK.addProduction(STATEMENT_FULL);
             BLOCK.addProduction(BLOCK, STATEMENT_FULL);
             STATEMENT_FULL.addProduction(STATEMENT, SEMICOLON);
@@ -69,7 +97,7 @@ public interface KLMNSymbols
             STATEMENT_FULL.addProduction(KW_WHILE, ROUND_OPEN, EXPRESSION, ROUND_CLOSE, CURLY_OPEN, BLOCK, CURLY_CLOSE);
             STATEMENT.addProduction(ASSIGNMENT);
             STATEMENT.addProduction(ARRAY_INIT);
-            ASSIGNMENT.addProduction(KW_VAR, IDENTIFIER, ASSIGN, EXPRESSION);
+            ASSIGNMENT.addProduction(VAR_DECL);
             ASSIGNMENT.addProduction(IDENTIFIER, ASSIGN, EXPRESSION);
             ASSIGNMENT.addProduction(IDENTIFIER, SQUARE_OPEN, EXPRESSION, SQUARE_CLOSE, ASSIGN, EXPRESSION);
             ARRAY_INIT.addProduction(KW_VAR, SQUARE_OPEN, EXPRESSION, SQUARE_CLOSE, IDENTIFIER);
@@ -115,5 +143,5 @@ public interface KLMNSymbols
             ARRAY_VALUE.addProduction(ARRAY_VALUE, COMMA, EXPRESSION);
         }
     };
-    Grammar GRAMMAR = new Grammar(BLOCK);
+    Grammar GRAMMAR = new Grammar(MODULE);
 }

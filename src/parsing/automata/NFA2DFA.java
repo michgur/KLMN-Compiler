@@ -1,4 +1,4 @@
-package automata;
+package parsing.automata;
 
 import java.util.*;
 

@@ -1,6 +1,9 @@
 package util;
 
-public class Pair<K, V> {
+import java.util.Objects;
+
+public class Pair<K, V>
+{
     private K k;
     private V v;
 
@@ -24,8 +27,7 @@ public class Pair<K, V> {
         if (o == null || getClass() != o.getClass()) return false;
 
         Pair<?, ?> pair = (Pair<?, ?>) o;
-        return (k != null ? k.equals(pair.k) : pair.k == null) &&
-                (v != null ? v.equals(pair.v) : pair.v == null);
+        return (Objects.equals(k, pair.k)) && (Objects.equals(v, pair.v));
     }
 
     @Override

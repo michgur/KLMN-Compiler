@@ -1,11 +1,11 @@
-package automata;
+package parsing.automata;
 
 import java.util.*;
 
 /**
  * ಠ^ಠ.
  *
- * * A Deterministic Finite State Machine
+ * A Deterministic Finite State Machine
  * S - State Value Type
  * I - Input Type
  *

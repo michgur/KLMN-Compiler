@@ -1,5 +1,6 @@
 package jvm.classes;
 
+import jvm.JVMType;
 import jvm.Opcodes;
 import util.ByteList;
 
@@ -11,6 +12,7 @@ import java.util.Set;
 
 public class ConstPool implements Opcodes
 {
+
     public static final byte CONSTANT_Class                 = 7;
     public static final byte CONSTANT_Fieldref              = 9;
     public static final byte CONSTANT_Methodref             = 10;
@@ -61,7 +63,7 @@ public class ConstPool implements Opcodes
                 (byte)((nameIndex >> 8) & 0xFF), (byte) (nameIndex & 0xFF) });
     }
     public short addClass(String name) { return addClass(addUtf8(name)); }
-    public short addClass(Class cls) { return addClass(addUtf8(cls.getName().replace('.', '/'))); }
+    public short addClass(JVMType type) { return addClass(addUtf8(type.getDescriptor())); }
     public short addMethodref(short classIndex, short nameTypeIndex) {
         return addConstInfo(CONSTANT_Methodref, new byte[] {
             (byte)((classIndex >> 8) & 0xFF), (byte) (classIndex & 0xFF),
@@ -69,13 +71,15 @@ public class ConstPool implements Opcodes
     }
     public short addMethodref(String className, String name, String descriptor)
     { return addMethodref(addClass(className), addNameAndType(name, descriptor)); }
+    public short addMethodref(String className, String name, JVMType type)
+    { return addMethodref(addClass(className), addNameAndType(name, type.getDescriptor())); }
     public short addMethodref(Method method) {
         return addMethodref(method.getDeclaringClass().getName().replace('.', '/'),
-            method.getName(), Opcodes.methodDescriptor(method));
+            method.getName(), JVMType.methodDescriptor(method));
     }
     public short addMethodref(Class cls, String method, Class ret, Class... params) {
         return addMethodref(cls.getName().replace('.', '/'),
-                method, Opcodes.methodDescriptor(ret, params));
+                method, JVMType.methodDescriptor(ret, params));
     }
     public short addFieldref(short classIndex, short nameTypeIndex) {
         return addConstInfo(CONSTANT_Fieldref, new byte[] {
@@ -84,13 +88,15 @@ public class ConstPool implements Opcodes
     }
     public short addFieldref(String className, String name, String descriptor)
     { return addFieldref(addClass(className), addNameAndType(name, descriptor)); }
+    public short addFieldref(String className, String name, JVMType type)
+    { return addFieldref(addClass(className), addNameAndType(name, type.getDescriptor())); }
     public short addFieldref(Field field) {
         return addFieldref(field.getDeclaringClass().getName().replace('.', '/'),
-                field.getName(), Opcodes.typeDescriptor(field.getType()));
+                field.getName(), JVMType.typeDescriptor(field.getType()));
     }
     public short addFieldref(Class cls, String name, Class type) {
         return addFieldref(cls.getName().replace('.', '/'),
-                name, Opcodes.typeDescriptor(type));
+                name, JVMType.typeDescriptor(type));
     }
     public short addInterfaceMethodref(short classIndex, short nameTypeIndex) {
         return addConstInfo(CONSTANT_InterfaceMethodref, new byte[] {

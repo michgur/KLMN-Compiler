@@ -1,6 +1,6 @@
 package parsing;
 
-import automata.DFA;
+import parsing.automata.DFA;
 import lexing.Grammar;
 import lexing.Symbol;
 import lexing.Terminal;

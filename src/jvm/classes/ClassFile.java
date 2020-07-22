@@ -2,7 +2,6 @@ package jvm.classes;
 
 import jvm.AttributeInfo;
 import jvm.Opcodes;
-import jvm.methods.Code;
 import jvm.methods.MethodInfo;
 import util.ByteList;
 
@@ -12,14 +11,14 @@ import java.util.*;
 
 public class ClassFile implements Opcodes
 {
-    private String name;
-    private short acc;
-    private ConstPool constPool = new ConstPool();
-    private List<MethodInfo> methods = new ArrayList<>();
-    private List<FieldInfo> fields = new ArrayList<>();
-    private List<AttributeInfo> attributes = new ArrayList<>();
-    private ByteList data = new ByteList();
-    private short thisIndex, superIndex;
+    private final String name;
+    private final short acc;
+    private final ConstPool constPool = new ConstPool();
+    private final List<MethodInfo> methods = new ArrayList<>();
+    private final List<FieldInfo> fields = new ArrayList<>();
+    private final List<AttributeInfo> attributes = new ArrayList<>();
+    private final ByteList data = new ByteList();
+    private final short thisIndex, superIndex;
     public ClassFile(String name) { this(name, ACC_PUBLIC); }
     public ClassFile(String name, int acc) {
         this.name = name;
@@ -31,7 +30,7 @@ public class ClassFile implements Opcodes
 
         thisIndex = constPool.addClass(name);
         superIndex = constPool.addClass("java/lang/Object");
-        attributes.add(new InnerClasses(this));
+//        attributes.add(new InnerClasses(this));
     }
 
     public ClassFile createInnerClass(String name, int acc) {
@@ -61,11 +60,14 @@ public class ClassFile implements Opcodes
 
         Path t = Paths.get("./" + name + ".class");
         Files.write(t, data.toByteArray());
-        Process p = Runtime.getRuntime().exec(new String[] { "java", "-cp", "home/michael/IdeaProjects/KLMN\u00A9 Compiler/klmn.jar:.", "TEMP" });
-        p.waitFor();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+        ProcessBuilder builder = new ProcessBuilder(
+        "cmd.exe", "/c", "java -cp \"C:\\Users\\micha\\IdeaProjects\\KLMN-Compiler\" Poop");
+        builder.redirectErrorStream(true);
+        Process p = builder.start();
+        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
         String line;
-        while ((line = reader.readLine()) != null) System.out.println(line);
+        while ((line = r.readLine()) != null) System.out.println(line);
 //        Files.delete(t); // comment line to check .class file
     }
 

@@ -1,8 +1,8 @@
 package parsing;
 
-import automata.DFA;
-import automata.NFA;
 import lexing.*;
+import parsing.automata.DFA;
+import parsing.automata.NFA;
 
 import java.util.*;
 
@@ -45,7 +45,7 @@ public class Parser // SLR(1) Parser
                 case REDUCE:
                     AST[] p = new AST[a.item.index];
                     for (int i = p.length - 1; i >= 0; i--) p[i] = stack.pop().getKey();
-                    stack.push(new AbstractMap.SimpleEntry<>(new AST(a.item.key, p) {
+                    stack.push(new AbstractMap.SimpleEntry<>(new AST(a.item.key, a.item.value, p) {
                     }, dfa.getTransition(stack.peek().getValue(), a.item.key)));
                     break;
                 case ACCEPT: return stack.get(1).getKey();

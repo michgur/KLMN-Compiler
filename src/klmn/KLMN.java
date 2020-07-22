@@ -1,11 +1,15 @@
 package klmn;
 
+import codegen.CodeGenerator;
 import jdk.internal.org.objectweb.asm.MethodVisitor;
 import jdk.internal.org.objectweb.asm.Opcodes;
+import jvm.classes.ClassFile;
 import lexing.Language;
 import lexing.TokenStream;
 import parsing.AST;
 import parsing.Parser;
+
+import java.io.IOException;
 
 /**
  * ಠ^ಠ.
@@ -91,13 +95,19 @@ public class KLMN implements Opcodes, KLMNSymbols
         return klmn;
     }
 
-    public static int compile(MethodVisitor mv, String code) {
+    public static void compile(String code) {
         Language klmn = initialize_language();
         TokenStream t = klmn.tokenize(code);
 
         AST ast = new Parser(KLMNSymbols.GRAMMAR).parse(t);
-        CodeGenInit.initialize_codeGenerator().apply(mv, ast);
+        ClassFile classFile = new ClassFile("Poop");
+        CodeGenerator writer = CodeGenInit.initialize_codeGenerator(classFile);
+        writer.apply(ast);
 
-        return CodeGenInit.getMaxLocals();
+        try {
+            classFile.run();
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }

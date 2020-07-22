@@ -1,9 +1,11 @@
 package jvm.methods;
 
 import jvm.AttributeInfo;
+import jvm.JVMType;
 import jvm.Opcodes;
 import jvm.classes.ClassFile;
 import util.ByteList;
+import util.Pair;
 
 import java.util.*;
 
@@ -29,20 +31,20 @@ public class StackMapTable extends AttributeInfo implements Opcodes
     public static final byte ITEM_Object = 7;
     public static final byte ITEM_Uninitialized = 8;
 
-    private static final String POP = "^", UNKNOWN = "?";
+    private static final JVMType POP = JVMType.refType("^"), UNKNOWN = JVMType.refType("?");
 
     private Block current = new Block(-1), first = current;
     private Frame firstFrame = new Frame();
     private short maxStack, maxLocals, nStack = 0;
     private Set<Label> targets = new HashSet<>();
     
-    public StackMapTable(ClassFile cls, String[] params) {
+    public StackMapTable(ClassFile cls, JVMType[] params) {
         super(cls, "StackMapTable");
         Collections.addAll(firstFrame.locals, params);
         maxLocals = (short) params.length;
     }
 
-    public void push(String type) {
+    public void push(JVMType type) {
         if (++nStack > maxStack) maxStack = nStack;
         current.out.stack.push(type);
     }
@@ -54,8 +56,9 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         else current.out.stack.push(POP);
     }
     public void pop(int n) { for (int i = 0; i < n; i++) pop(); }
+    public JVMType peek() { return current.out.stack.peek(); }
 
-    public void store(int index, String type) {
+    public void store(int index, JVMType type) {
         if (index + 1 > maxLocals) maxLocals = (short) (index + 1);
         int nLocals = current.out.locals.size();
         if (nLocals > index) current.out.locals.set(index, type);
@@ -66,7 +69,7 @@ public class StackMapTable extends AttributeInfo implements Opcodes
     }
 
     @Override
-    public boolean include() { return !targets.isEmpty(); }
+    public boolean include() { return true; }
 
     /* Required stack size for the method. Only use after fully writing code. */
     public short getMaxStack() { return maxStack; }
@@ -78,23 +81,26 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         current.next.add(target);
         targets.add(target);
         Label next = new Label();
-        Block c = current;
+        Block temp = current;
         assign(next, codePointer);
-        if (isGOTO) c.next.remove(next);
+        if (isGOTO) temp.next.remove(next);
     }
     
     /* Assign a Label at codePointer */
     public void assign(Label label, int codePointer) {
-        label.block = new Block(codePointer);
-        current.next.add(label);
-        current = label.block;
+        if (current.offset == codePointer) label.block = current;
+        else {
+            label.block = new Block(codePointer);
+            current.next.add(label);
+            current = label.block;
+        }
     }
 
     /* Represents a StackMap Frame */
     private static class Frame
     {
-        private Stack<String> stack = new Stack<>();
-        private List<String> locals = new ArrayList<>();
+        private Stack<JVMType> stack = new Stack<>();
+        private List<JVMType> locals = new ArrayList<>();
 
         @Override
         public boolean equals(Object obj) {
@@ -128,19 +134,22 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         @Override public String toString() { return "block " + i; }
     }
 
-    // todo- for incorrect code this ends up with a StackOverFlow, do something nicer
-    private void updateFrames(Block block, Frame input) {
+    private void updateFrames(Block block, Frame input, Set<Pair<Block, Label>> visited) {
         if (input.equals(block.in)) return;
         block.in = merge(block.in, input); // this merge appears to be redundant
         Frame nextInput = merge(block.in, block.out);
-        for (Label label : block.next) updateFrames(label.block, nextInput);
+        for (Label label : block.next) {
+            if (visited.contains(Pair.of(block, label))) continue;
+            visited.add(Pair.of(block, label));
+            updateFrames(label.block, nextInput, visited);
+        }
     }
 
     @Override
     public ByteList toByteList() {
         info.addShort(targets.size());
 
-        updateFrames(first, firstFrame);
+        updateFrames(first, firstFrame, new HashSet<>());
 
         Block prev = first;
         Set<Block> blocks = new TreeSet<>(); // sorted set (Block implements Comparable)
@@ -206,16 +215,17 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         return res;
     }
 
-    private void addVarInfo(String type) {
-        if (type.startsWith("[")) {
+    private void addVarInfo(JVMType type) {
+        if (type.isArrayType()) {
             info.addByte(ITEM_Object);
             info.addShort(cls.getConstPool().addClass(type));
-        } else switch (type) {
-            case "I": info.addByte(ITEM_Integer); break;
-            case "F": info.addByte(ITEM_Float); break;
-            default: // fixme handle other ITEMs
-                info.addByte(ITEM_Object);
-                info.addShort(cls.getConstPool().addClass(type.substring(1, type.length() - 1)));
+        }
+        else if (type == JVMType.INTEGER) info.addByte(ITEM_Integer);
+        else if (type == JVMType.FLOAT) info.addByte(ITEM_Float);
+// fixme handle other ITEMs
+        else {
+            info.addByte(ITEM_Object);
+            info.addShort(cls.getConstPool().addClass(type));
         }
     }
 }

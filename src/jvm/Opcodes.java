@@ -1,8 +1,6 @@
 package jvm;
 
-import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -24,7 +22,7 @@ public interface Opcodes
     byte FCONST_2 = (byte) 13; 
     byte DCONST_0 = (byte) 14; 
     byte DCONST_1 = (byte) 15; 
-    byte BIPUSH = (byte) 16; 
+    byte BIPUSH = (byte) 16;
     byte SIPUSH = (byte) 17; 
     byte LDC = (byte) 18; 
     byte LDC_W = (byte) 19; 
@@ -214,26 +212,106 @@ public interface Opcodes
     Set<Byte> binaryOperators = new HashSet<>(Arrays.asList( // todo: fill
             IADD, ISUB, IDIV, IMUL, IF_ICMPEQ, IF_ICMPNE, IF_ICMPLT, IF_ICMPLE, IF_ICMPGT, IF_ICMPGE, IF_ACMPEQ, IF_ACMPNE,
             FADD, FSUB, FDIV, FMUL, DADD, DSUB, DDIV, DMUL, LADD, LSUB, LDIV, LMUL, IREM, FREM, DREM, LREM,
-            FCMPG, FCMPL, DCMPG, DCMPL, LCMP
+            FCMPG, FCMPL, DCMPG, DCMPL, LCMP, IAND, IOR
     )), unaryOperators = new HashSet<>(Arrays.asList(
             INEG, FNEG, DNEG, LNEG, IFEQ, IFNE, IFLT, IFLE, IFGT, IFGE,
-            I2F, I2B, I2C, I2D, I2L, I2S, F2I, F2D, F2L
+            I2F, I2B, I2C, I2D, I2L, I2S, F2I, F2D, F2L, ARRAYLENGTH
     )), jmpOperators = new HashSet<>(Arrays.asList(
             IF_ICMPEQ, IF_ICMPNE, IF_ICMPLT, IF_ICMPLE, IF_ICMPGT, IF_ICMPGE, IF_ACMPEQ, IF_ACMPNE,
             GOTO, GOTO_W, IFEQ, IFNE, IFLT, IFLE, IFGT, IFGE
     )), intOperators = new HashSet<>(Arrays.asList( // operators that push int onto the stack
-            IADD, ISUB, IDIV, IMUL, IREM, INEG, DCMPL, DCMPG, LCMP, FCMPG, FCMPL
+            IADD, ISUB, IDIV, IMUL, IREM, INEG, DCMPL, DCMPG, LCMP, FCMPG, FCMPL, ARRAYLENGTH, IAND, IOR
     )), floatOperators = new HashSet<>(Arrays.asList(FADD, FSUB, FDIV, FMUL, FNEG))
     , doubleOperators = new HashSet<>(Arrays.asList(DADD, DSUB, DDIV, DMUL, DREM, DNEG))
     , longOperators = new HashSet<>(Arrays.asList(LADD, LSUB, LDIV, LMUL, LREM, LNEG));
-    static String getType(byte opcode) {
-        if (intOperators.contains(opcode)) return "I";
-        if (longOperators.contains(opcode)) return "J";
-        if (floatOperators.contains(opcode)) return "F";
-        if (doubleOperators.contains(opcode)) return "D";
+    static JVMType getType(byte opcode) {
+        if (intOperators.contains(opcode)) return JVMType.INTEGER;
+        if (longOperators.contains(opcode)) return JVMType.LONG;
+        if (floatOperators.contains(opcode)) return JVMType.FLOAT;
+        if (doubleOperators.contains(opcode)) return JVMType.DOUBLE;
         throw new RuntimeException("cannot find return type for opcode " + opcode);
     }
 
+    static byte getLoadOpcode(int index, JVMType type) {
+        int typeOffset = switch (type.getDescriptor()) {
+            case "I" -> 0;
+            case "J" -> 1;
+            case "F" -> 2;
+            case "D" -> 3;
+            default -> 4;
+        };
+        if (index < 4) return (byte) (ILOAD_0 + index + typeOffset * 4);
+        else return (byte) (ILOAD + typeOffset);
+    }
+    static byte getStoreOpcode(int index, JVMType type) {
+        int typeOffset = switch (type.getDescriptor()) {
+            case "I" -> 0;
+            case "J" -> 1;
+            case "F" -> 2;
+            case "D" -> 3;
+            default -> 4;
+        };
+        if (index < 4) return (byte) (ISTORE_0 + index + typeOffset * 4);
+        else return (byte) (ISTORE + typeOffset);
+    }
+    static byte getConvertOpcode(JVMType from, JVMType to) {
+        return (byte) switch (from.getDescriptor()) {
+            case "I" -> I2L + switch (to.getDescriptor()) {
+                case "J" -> 0;
+                case "F" -> 1;
+                case "D" -> 2;
+                case "B" -> 12;
+                case "C" -> 13;
+                case "S" -> 14;
+                default -> throw new RuntimeException("unsupported JVM type conversion " + from + " -> " + to);
+            };
+            case "J" -> L2I + switch (to.getDescriptor()) {
+                case "I" -> 0;
+                case "F" -> 1;
+                case "D" -> 2;
+                default -> throw new RuntimeException("unsupported JVM type conversion " + from + " -> " + to);
+            };
+            case "F" -> F2I + switch (to.getDescriptor()) {
+                case "I" -> 0;
+                case "J" -> 1;
+                case "D" -> 2;
+                default -> throw new RuntimeException("unsupported JVM type conversion " + from + " -> " + to);
+            };
+            case "D" -> D2I + switch (to.getDescriptor()) {
+                case "I" -> 0;
+                case "J" -> 1;
+                case "F" -> 2;
+                default -> throw new RuntimeException("unsupported JVM type conversion " + from + " -> " + to);
+            };
+            default -> throw new RuntimeException("unsupported JVM type conversion " + from + " -> " + to);
+        };
+    }
+    static byte getArrayStoreOpcode(JVMType type) {
+        return (byte) (IASTORE + switch (type.getDescriptor()) {
+            case "[I" -> 0;
+            case "[J" -> 1;
+            case "[F" -> 2;
+            case "[D" -> 3;
+            case "[B" -> 5;
+            case "[Z" -> 5;
+            case "[C" -> 6;
+            case "[S" -> 7;
+            default -> 4;
+        });
+    }
+    static byte getArrayLoadOpcode(JVMType type) {
+        return (byte) (IALOAD + switch (type.getDescriptor()) {
+            case "[I" -> 0;
+            case "[J" -> 1;
+            case "[F" -> 2;
+            case "[D" -> 3;
+            case "[B" -> 5;
+            case "[Z" -> 5;
+            case "[C" -> 6;
+            case "[S" -> 7;
+            default -> 4;
+        });
+    }
 
     short ACC_PUBLIC = 0x0001;
     short ACC_PRIVATE = 0x0002;
@@ -251,36 +329,4 @@ public interface Opcodes
     short ACC_SYNTHETIC = 0x1000;
     short ACC_ANNOTATION = 0x2000;
     short ACC_ENUM = 0x4000;
-    
-    static String typeDescriptor(Class c) {
-        String name = c.getCanonicalName();
-        final int[] dim = { 0 };
-        name.chars().forEach(i -> { if (((char) i) == '[') dim[0]++;});
-        if (dim[0] > 0) name = name.substring(0, name.indexOf('['));
-        switch (name) {
-            case "void": name = "V"; break;
-            case "byte": name = "B"; break;
-            case "char": name = "C"; break;
-            case "int": name = "I"; break;
-            case "float": name = "F"; break;
-            case "long": name = "J"; break;
-            case "double": name = "D"; break;
-            case "short": name = "S"; break;
-            case "boolean": name = "Z"; break;
-            default: name = 'L' + name.replace('.', '/') + ';';
-        }
-        return String.join("" ,Collections.nCopies(dim[0], "[")) + name;
-    }
-
-    static String methodDescriptor(Method m) {
-        StringBuilder s = new StringBuilder().append('(');
-        for (Class c : m.getParameterTypes()) s.append(typeDescriptor(c));
-        return s.append(')').append(typeDescriptor(m.getReturnType())).toString();
-    }
-
-    static String methodDescriptor(Class ret, Class... params) {
-        StringBuilder s = new StringBuilder().append('(');
-        for (Class c : params) s.append(typeDescriptor(c));
-        return s.append(')').append(typeDescriptor(ret)).toString();
-    }
 }
