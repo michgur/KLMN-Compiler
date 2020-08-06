@@ -78,6 +78,7 @@ ClassFile cls = new ClassFile("test");
 CodeGenerator generator = new CodeGenerator(cls);
 ```
 For the CodeGenerator to work, we need to specify how every symbol production is compiled to bytecode. To do that we bind visitor functions for every production.
+Semantic analysis and code optimization could also be done here.
 ```java
 // the signature of a visitor function is (CodeGenerator, AST[]) -> void, the AST array correlates to the items of the production.
 generator.addVisitor(ROOT, new Symbol[] { PLUS_EXP }, (g, ast) -> {
