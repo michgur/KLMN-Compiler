@@ -1,6 +1,6 @@
 # KLMN Compiler Framework
 
-## This framework allows parsing of SLR(1) grammar languages and compiling them into JVM bytecode
+### This framework allows parsing of SLR(1) grammar languages and compiling them into JVM bytecode
 ### Supported features to implement into your language:
 * Arithmetic expressions
 * Variables
@@ -9,7 +9,8 @@
 * Functions
 * Interoprablity with other JVM languages
 * **The only limit is your imagination!** (and the JVM limitations) 
-### How to create a programming language using the KLMN© Compiler Framework:
+# How to create a programming language using the KLMN© Compiler Framework:
+_See the klmn package in the source code for a more detailed & complex example_
 ## Step 1: Terminal symbols and Tokenizer
 Terminal Symbols are the 'words' of your language. Let's define some Terminals:
 ```java
