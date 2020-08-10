@@ -76,7 +76,7 @@ public class CodeGenerator
         if (typeChecker == null) {
             if (ast.getProduction().length == 1) return applyTypeChecked(ast.getChildren()[0]);
             else {
-                StringBuilder error = new StringBuilder("undefined behavior for production " + ast.getValue() + " -> ");
+                StringBuilder error = new StringBuilder("undefined type checked behavior for production " + ast.getValue() + " -> ");
                 for (Symbol s : ast.getProduction()) error.append(s).append(" ");
                 throw new RuntimeException(error.toString());
             }

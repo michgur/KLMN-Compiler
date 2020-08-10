@@ -85,6 +85,7 @@ public class CodeGenInit implements Opcodes, KLMNSymbols
             }
         });
         generator.addTypeCheckedVisitor(VALUE, new Symbol[] { ROUND_OPEN, EXPRESSION, ROUND_CLOSE }, (g, ast) -> g.applyTypeChecked(ast[1]));
+        generator.addVisitor(VALUE, new Symbol[] { ROUND_OPEN, EXPRESSION, ROUND_CLOSE }, (g, ast) -> g.apply(ast[1]));
         generator.addTypeCheckedVisitor(VALUE, new Symbol[] { IDENTIFIER, SQUARE_OPEN, EXPRESSION, SQUARE_CLOSE }, ArrayExpressions::access);
 
         return generator;
