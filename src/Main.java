@@ -1,5 +1,6 @@
 import jvm.classes.ClassFile;
 import klmn.KLMN;
+import lexing.Terminal;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;

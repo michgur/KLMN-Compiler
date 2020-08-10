@@ -13,6 +13,8 @@
 _See the klmn package in the source code for a more detailed & complex example_
 
 **In this example we will create a simple programming language that consists of mathematical expressions, and will support the following operators: `+-*/()`. Our compiler will recieve such an expression and will create a `.class` file that calculates the expression and prints the result.**
+
+Example: `4 * (3 / 2 + 1)`
 ## Step 1: Terminal symbols and Tokenizer
 Terminal Symbols are the 'words' of your language. Let's define some Terminals:
 ```java
@@ -50,14 +52,16 @@ tokenizer.addTerminal(NUMBER, (src, i) -> {   // a terminal that corresponds to 
 ```
 Now the Tokenizer is able to take a String and convert it to a TokenStream.
 ```java
-TokenStream stream = tokenizer.tokenize(code); // code here is the string we want to compile
+String code = new String(Files.readAllBytes(Paths.get(YOUR_SOURCE_PATH)));
+TokenStream stream = tokenizer.tokenize(code);
 ```
 ## Step 2: Grammar and Parser
 Next, we define the Grammar of our language using Symbols. Symbols are parts of the language, they can be literal (Terminals), or Sentences, Statements, Expressions, etc.
 ```java
 Symbol ROOT = new Symbol("root");
-Symbol TIMES_EXP = new Symbol("* expression");
-Symbol PLUS_EXP = new Symbol("+ expression");
+Symbol TIMES_EXP = new Symbol("*expression");
+Symbol PLUS_EXP = new Symbol("+expression");
+Symbol VALUE = new Symbol("value");
 
 ROOT.addProduction(PLUS_EXP);
 PLUS_EXP.addProduction(PLUS_EXP, PLUS, TIMES_EXP);
@@ -88,29 +92,29 @@ For the CodeGenerator to work, we need to specify how every symbol production is
 Semantic analysis and code optimization could also be done here.
 ```java
 // the signature of a visitor function is (CodeGenerator, AST[]) -> void, the AST array correlates to the items of the production.
-generator.addVisitor(ROOT, new Symbol[] { PLUS_EXP }, (g, ast) -> {
-  g.addMethod("main", Opcodes.ACC_STATIC, JVMType.VOID, JVMType.arrayType(JVMType.refType("java/lang/String"))); // add the main method to the class file for the JVM to run
+generator.addVisitor(ROOT, new Symbol[] { PLUS_EXP }, (g, asts) -> {
+  g.addMethod("main", Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, JVMType.VOID, JVMType.arrayType(JVMType.refType("java/lang/String"))); // add the main method to the class file for the JVM to run
   g.editMethod("main"); // following instructions will be added to this method
   
   // the PLUS_EXP AST will push a float value onto the stack. let's print it
   g.pushField("java/lang/System", "out", JVMType.refType("java.io.PrintStream"), true);
-  g.apply(ast[0]); 
+  g.apply(asts[0]); 
   g.call("java/io/PrintStream", "println", JVMType.VOID, JVMType.FLOAT);
   g.ret(); // add a return instruction
 });
-generator.addVisitor(PLUS_EXP, new Symbol[] { PLUS_EXP, PLUS, TIMES_EXP }, (g, ast) -> binaryOp(Opcodes.FADD));
-generator.addVisitor(PLUS_EXP, new Symbol[] { PLUS_EXP, MINUS, TIMES_EXP }, (g, ast) -> binaryOp(Opcodes.FSUB));
-generator.addVisitor(PLUS_EXP, new Symbol[] { TIMES_EXP }, (g, ast) -> g.apply(ast[0]));
-generator.addVisitor(PLUS_EXP, new Symbol[] { TIMES_EXP, TIMES, VALUE }, (g, ast) -> binaryOp(Opcodes.FMUL));
-generator.addVisitor(PLUS_EXP, new Symbol[] { TIMES_EXP, DIVIDE, VALUE }, (g, ast) -> binaryOp(Opcodes.FDIV));
-generator.addVisitor(TIMES_EXP, new Symbol[] { VALUE }, (g, ast) -> g.apply(ast[0]));  // for productions with one child, the generator will do this automatically if a visitor is not present. I put this here for clarity.
-generator.addVisitor(VALUE, new Symbol[] { PAREN_OPEN, PLUS_EXP, PAREN_CLOSE }, (g, ast) -> g.apply(ast[1]));
-generator.addVisitor(VALUE, new Symbol[] { NUMBER }, (g, ast) -> g.pushFloat(Float.parseFloat(ast[0].getText())));
+generator.addVisitor(PLUS_EXP, new Symbol[] { PLUS_EXP, PLUS, TIMES_EXP }, (g, asts) -> binaryOp(g, asts, Opcodes.FADD));
+generator.addVisitor(PLUS_EXP, new Symbol[] { PLUS_EXP, MINUS, TIMES_EXP }, (g, asts) -> binaryOp(g, asts, Opcodes.FSUB));
+generator.addVisitor(PLUS_EXP, new Symbol[] { TIMES_EXP }, (g, asts) -> g.apply(asts[0]));
+generator.addVisitor(TIMES_EXP, new Symbol[] { TIMES_EXP, TIMES, VALUE }, (g, asts) -> binaryOp(g, asts, Opcodes.FMUL));
+generator.addVisitor(TIMES_EXP, new Symbol[] { TIMES_EXP, DIVIDE, VALUE }, (g, asts) -> binaryOp(g, asts, Opcodes.FDIV));
+generator.addVisitor(TIMES_EXP, new Symbol[] { VALUE }, (g, asts) -> g.apply(asts[0]));  // for productions with one child, the generator will do this automatically if a visitor is not present. I put this here for clarity.
+generator.addVisitor(VALUE, new Symbol[] { PAREN_OPEN, PLUS_EXP, PAREN_CLOSE }, (g, asts) -> g.apply(asts[1]));
+generator.addVisitor(VALUE, new Symbol[] { NUMBER }, (g, asts) -> g.pushFloat(Float.parseFloat(asts[0].getText())));
 ...
 // helper function to generate arithmetic binary operator code
-void binaryOp(CodeGenerator g, AST[] ast, byte opcode) {
-  g.apply(ast[0]);
-  g.apply(ast[2]);
+void binaryOp(CodeGenerator g, AST[] asts, byte opcode) {
+  g.apply(asts[0]);
+  g.apply(asts[2]);
   g.useOperator(opcode);
 }
 ```
@@ -121,9 +125,10 @@ generator.apply(ast);
 Now our ClassFile has the generated bytecode. We can use the `toByteArray()` method to save its data in a `.class` file:
 ```java
 Path path = Paths.get("./test.class");
-Files.write(path, file.toByteArray());
+Files.write(path, cls.toByteArray());
 ```
 Run the `.class` file:
 ```cmd
-java -cp ./test
+java -cp ./ test
 ```
+In our example, we get `10`!

@@ -222,7 +222,6 @@ public class CodeGenerator
     public void ret() { ret(JVMType.VOID); }
     /* Return an item of type from the current Method */
     public void ret(JVMType type) {
-        symbolTable.exitScope();
         if (type == JVMType.VOID) code.retOperator(Opcodes.RETURN, true);
         else if (type == JVMType.INTEGER) code.retOperator(Opcodes.IRETURN, false);
         else if (type == JVMType.FLOAT) code.retOperator(Opcodes.FRETURN, false);

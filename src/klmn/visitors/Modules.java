@@ -19,6 +19,7 @@ public class Modules
         generator.addMethod("<clinit>", Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC, JVMType.VOID);
         generator.editMethod("<clinit>");
         generator.apply(ast[0]);
+        generator.getSymbolTable().exitScope();
         generator.ret();
 
         for (MethodVisitor method : methods.keySet()) method.apply(generator, methods.get(method));

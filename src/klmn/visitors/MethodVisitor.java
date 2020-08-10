@@ -24,6 +24,7 @@ public class MethodVisitor implements CodeGenerator.Visitor
         for (Pair<JVMType, String> p : params)
             generator.getSymbolTable().addSymbol(p.getValue(), p.getKey());
         generator.apply(ast[0]);
+        generator.getSymbolTable().exitScope();
         generator.ret();
     }
 
