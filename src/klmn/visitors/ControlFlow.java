@@ -2,9 +2,9 @@ package klmn.visitors;
 
 import codegen.CodeGenerator;
 import codegen.SymbolTable;
+import jvm.JVMType;
 import jvm.Opcodes;
 import jvm.methods.Label;
-import klmn.KLMNSymbols;
 import parsing.AST;
 
 import java.util.HashMap;
@@ -25,10 +25,14 @@ public class ControlFlow
     }
 
     private static void condition(byte opcode, CodeGenerator generator, AST... ast) {
-        generator.apply(ast[0]);
-        generator.apply(ast[2]);
-        generator.useOperator(Opcodes.FCMPG);
-        generator.useJmpOperator(invert ? opposites.get(opcode) : opcode, target);
+        JVMType left = generator.applyTypeChecked(ast[0]);
+        JVMType right = generator.applyTypeChecked(ast[2]);
+        if (right != left) generator.convertTop(right, left);
+
+        if (left == JVMType.FLOAT) {
+            generator.useOperator(Opcodes.FCMPG);
+            generator.useJmpOperator(invert ? opposites.get(opcode) : opcode, target);
+        } else generator.useJmpOperator((byte) ((invert ? opposites.get(opcode) : opcode) + 6), target);
     }
     public static void lessThan(CodeGenerator generator, AST... ast) { condition(Opcodes.IFLT, generator, ast); }
     public static void greaterThan(CodeGenerator generator, AST... ast) { condition(Opcodes.IFGT, generator, ast); }

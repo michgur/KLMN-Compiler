@@ -32,16 +32,16 @@ public class MethodVisitor implements CodeGenerator.Visitor
 
         params = new ArrayList<>();
         if (p.getChildren().length > 0) {
-        p.getChildren()[0].leftmostTraverse(KLMNSymbols.PARAMS_DECL_NON_ZERO, param -> {
+            p.getChildren()[0].leftmostTraverse(KLMNSymbols.PARAMS_DECL_NON_ZERO, param -> {
 //            PARAMS_DECL_NON_ZERO -> TYPE IDENTIFIER
 //            PARAMS_DECL_NON_ZERO -> PARAMS_DECL_NON_ZERO COMMA TYPE IDENTIFIER
-            int index = param.getChildren().length - 2;
-            params.add(Pair.of(KLMNTypes.getType(param.getChildren()[index]).getJvmType(),
-                    param.getChildren()[index + 1].getText()));
-        });
+                int index = param.getChildren().length - 2;
+                params.add(Pair.of(KLMNTypes.getType(param.getChildren()[index]),
+                        param.getChildren()[index + 1].getText()));
+            });
         }
 
-        JVMType type = KLMNTypes.getType(ast[0]).getJvmType();
+        JVMType type = KLMNTypes.getType(ast[0]);
         JVMType[] paramTypes = new JVMType[params.size()];
         for (int i = 0; i < paramTypes.length; i++) paramTypes[i] = params.get(i).getKey();
 

@@ -4,59 +4,74 @@ import codegen.CodeGenerator;
 import codegen.SymbolTable;
 import jvm.JVMType;
 import jvm.Opcodes;
+import klmn.KLMNSymbols;
 import klmn.KLMNTypes;
 import parsing.AST;
 
-import java.util.Stack;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ArrayExpressions
 {
     public static void assign(CodeGenerator generator, AST[] ast) {
         generator.push(ast[0].getText());
-        generator.apply(ast[2]);
-        generator.convertTop(JVMType.FLOAT, JVMType.INTEGER);
-        generator.apply(ast[5]);
+        JVMType indexType = generator.applyTypeChecked(ast[2]);
+        if (indexType == JVMType.FLOAT) generator.convertTop(JVMType.FLOAT, JVMType.INTEGER);
+        else if (indexType != JVMType.INTEGER)
+            throw new RuntimeException("error when accessing array " + ast[0].getText() + "- integer expected ");
+        JVMType arrayType = generator.getSymbolTable().typeOf(ast[0].getText()).getBaseType();
+        JVMType valueType = generator.applyTypeChecked(ast[5]);
+        if (valueType != arrayType) generator.convertTop(valueType, arrayType);
         generator.popToArray(ast[0].getText());
     }
 
-    public static void access(CodeGenerator generator, AST[] ast) {
+    public static JVMType access(CodeGenerator generator, AST[] ast) {
         generator.push(ast[0].getText());
-        generator.apply(ast[2]);
-        generator.convertTop(JVMType.FLOAT, JVMType.INTEGER);
+        JVMType type = generator.applyTypeChecked(ast[2]);
+        if (type == JVMType.FLOAT) generator.convertTop(JVMType.FLOAT, JVMType.INTEGER);
+        else if (type != JVMType.INTEGER)
+            throw new RuntimeException("error when accessing array " + ast[0].getText() + "- integer expected ");
         generator.pushFromArray(ast[0].getText());
+        return generator.getSymbolTable().typeOf(ast[0].getText()).getBaseType();
     }
 
-    private static final JVMType FLOAT_ARRAY = JVMType.arrayType(JVMType.FLOAT, 1);
     public static void init(CodeGenerator generator, AST[] ast) {
         String name = ast[4].getText();
+        JVMType type = JVMType.arrayType(KLMNTypes.getType(ast[0]));
         if (generator.getSymbolTable().isDefinedLocally(name)) throw new RuntimeException("variable " + name + " already defined!");
         if (generator.getSymbolTable().getContext() != SymbolTable.Context.CLASS) {
-            generator.getSymbolTable().addSymbol(name, FLOAT_ARRAY);
-        } else { generator.addField(name, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, FLOAT_ARRAY); }
+            generator.getSymbolTable().addSymbol(name, type);
+        } else { generator.addField(name, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, type); }
         generator.apply(ast[2]);
         generator.convertTop(JVMType.FLOAT, JVMType.INTEGER);
-        generator.pushNewArray(KLMNTypes.FLOAT_ARRAY.getJvmType());
+        generator.pushNewArray(type);
         generator.popTo(name);
     }
     public static void initWithValues(CodeGenerator generator, AST[] ast) {
         String name = ast[3].getText();
+        JVMType type = JVMType.arrayType(KLMNTypes.getType(ast[0]));
+        if (!type.isArrayType()) throw new RuntimeException("array type expected!");
+
         if (generator.getSymbolTable().isDefinedLocally(name)) throw new RuntimeException("variable " + name + " already defined!");
         if (generator.getSymbolTable().getContext() != SymbolTable.Context.CLASS) {
-            generator.getSymbolTable().addSymbol(name, FLOAT_ARRAY);
-        } else { generator.addField(name, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, FLOAT_ARRAY); }
+            generator.getSymbolTable().addSymbol(name, type);
+        } else { generator.addField(name, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, type); }
 
-        AST value = ast[6];
-        Stack<AST> values = new Stack<>();
-        while (value.getChildren().length > 1) {
-            values.push(value.getChildren()[2]);
-            value = value.getChildren()[0];
-        } values.push(value.getChildren()[0]);
+        List<AST> values = new ArrayList<>();
+        ast[6].leftmostTraverse(KLMNSymbols.ARRAY_VALUE, value -> {
+//            ARRAY_VALUE -> EXPRESSION
+//            ARRAY_VALUE -> ARRAY_VALUE COMMA EXPRESSION
+            int index = value.getChildren().length - 1;
+            values.add(value.getChildren()[index]);
+        });
         generator.pushInt(values.size());
-        generator.pushNewArray(KLMNTypes.FLOAT_ARRAY.getJvmType());
+        generator.pushNewArray(type);
+        JVMType arrayType = type.getBaseType();
         for (int i = 0, size = values.size(); i < size; i++) {
             generator.dup();
             generator.pushInt(i);
-            generator.apply(values.pop());
+            JVMType valueType = generator.applyTypeChecked(values.get(i));
+            if (valueType != arrayType) generator.convertTop(valueType, arrayType);
             generator.popToArray(name);
         }
         generator.popTo(name);

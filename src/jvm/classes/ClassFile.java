@@ -5,9 +5,8 @@ import jvm.Opcodes;
 import jvm.methods.MethodInfo;
 import util.ByteList;
 
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ClassFile implements Opcodes
 {
@@ -38,7 +37,7 @@ public class ClassFile implements Opcodes
         return new ClassFile(this.name + "$" + name, acc);
     }
 
-    public void run() throws IOException, InterruptedException {
+    public byte[] toByteArray() {
         ByteList m = new ByteList(), f = new ByteList(), a = new ByteList();
         for (MethodInfo method : methods) m.addAll(method.toByteList());
         for (FieldInfo field : fields) f.addAll(field.toByteList());
@@ -58,17 +57,7 @@ public class ClassFile implements Opcodes
         data.addShort(attributes.size());       // attributes_count
         data.addAll(a);                         // attributes[attributes_count]
 
-        Path t = Paths.get("./" + name + ".class");
-        Files.write(t, data.toByteArray());
-
-        ProcessBuilder builder = new ProcessBuilder(
-        "cmd.exe", "/c", "java -cp \"C:\\Users\\micha\\IdeaProjects\\KLMN-Compiler\" Poop");
-        builder.redirectErrorStream(true);
-        Process p = builder.start();
-        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line;
-        while ((line = r.readLine()) != null) System.out.println(line);
-//        Files.delete(t); // comment line to check .class file
+        return data.toByteArray();
     }
 
     public ConstPool getConstPool() { return constPool; }

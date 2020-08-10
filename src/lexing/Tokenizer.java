@@ -4,6 +4,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * ಠ^ಠ.
@@ -11,30 +14,30 @@ import java.util.Set;
  *
  * This Class Manages A Grammar & Its Tokens
  */
-public class Language
+public class Tokenizer
 {
     // data for tokenizing code
     Map<Character, Terminal> operators = new HashMap<>();
     Map<String, Terminal> keywords = new HashMap<>();
-    Set<Tokenizer> ignored = new HashSet<>();
-    Map<Tokenizer, Terminal> others = new HashMap<>();
+    Set<Reader> ignored = new HashSet<>();
+    Map<Reader, Terminal> others = new HashMap<>();
 
-    public interface Tokenizer { String read(String src, int index); }
+    public interface Reader extends BiFunction<String, Integer, String> {}
 
-    public Language addTerminal(Terminal terminal, Character operator) {
+    public Tokenizer addTerminal(Terminal terminal, Character operator) {
         operators.put(operator, terminal);
         return this;
     }
-    public Language addTerminal(Terminal terminal, String keyword) {
+    public Tokenizer addTerminal(Terminal terminal, String keyword) {
         keywords.put(keyword, terminal);
         return this;
     }
-    public Language addTerminal(Terminal terminal, Tokenizer tokenizer) {
-        others.put(tokenizer, terminal);
+    public Tokenizer addTerminal(Terminal terminal, Reader reader) {
+        others.put(reader, terminal);
         return this;
     }
-    public Language ignore(Tokenizer tokenizer) {
-        ignored.add(tokenizer);
+    public Tokenizer ignore(Reader reader) {
+        ignored.add(reader);
         return this;
     }
 

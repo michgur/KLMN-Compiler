@@ -4,62 +4,81 @@ import codegen.CodeGenerator;
 import jvm.JVMType;
 import jvm.Opcodes;
 import klmn.KLMNSymbols;
-import lexing.Symbol;
 import parsing.AST;
 
 public class Expressions implements KLMNSymbols
 {
-    public static void length(CodeGenerator generator, AST... ast) {
+    public static JVMType length(CodeGenerator generator, AST... ast) {
 //        KW_LENGTH ROUND_OPEN IDENTIFIER ROUND_CLOSE
         generator.push(ast[2].getText());
         generator.useOperator(Opcodes.ARRAYLENGTH);
-        generator.convertTop(JVMType.INTEGER, JVMType.FLOAT);
+        return JVMType.INTEGER;
     }
 
-    private static void unaryOpPre(byte opcode, CodeGenerator generator, AST... ast) {
+    private static JVMType unaryOpPre(byte opcode, CodeGenerator generator, AST... ast) {
         if (ast[1].getChildren()[0].getValue() != IDENTIFIER)
             throw new RuntimeException("variable expected!");
         String name = ast[1].getChildren()[0].getText();
+        JVMType type = generator.getSymbolTable().typeOf(name);
         generator.push(name);
-        generator.pushFloat(1);
-        generator.useOperator(opcode);
+        if (type == JVMType.FLOAT) generator.pushFloat(1);
+        else generator.pushInt(1);
+        generator.useOperator(getOpcode(opcode, type));
         generator.popTo(name);
         generator.push(name);
+        return type;
     }
-    private static void unaryOpPost(byte opcode, CodeGenerator generator, AST... ast) {
+    private static JVMType unaryOpPost(byte opcode, CodeGenerator generator, AST... ast) {
         if (ast[0].getChildren()[0].getValue() != IDENTIFIER)
             throw new RuntimeException("variable expected!");
         String name = ast[0].getChildren()[0].getText();
+        JVMType type = generator.getSymbolTable().typeOf(name);
         generator.push(name);
         generator.dup();
-        generator.pushFloat(1);
-        generator.useOperator(opcode);
+        if (type == JVMType.FLOAT) generator.pushFloat(1);
+        else generator.pushInt(1);
+        generator.useOperator(getOpcode(opcode, type));
         generator.popTo(name);
+        return type;
     }
-    public static void preIncrement(CodeGenerator generator, AST... ast) { unaryOpPre(Opcodes.FADD, generator, ast); }
-    public static void preDecrement(CodeGenerator generator, AST... ast) { unaryOpPre(Opcodes.FSUB, generator, ast); }
-    public static void postIncrement(CodeGenerator generator, AST... ast) { unaryOpPost(Opcodes.FADD, generator, ast); }
-    public static void postDecrement(CodeGenerator generator, AST... ast) { unaryOpPost(Opcodes.FSUB, generator, ast); }
+    public static JVMType preIncrement(CodeGenerator generator, AST... ast) { return unaryOpPre(Opcodes.IADD, generator, ast); }
+    public static JVMType preDecrement(CodeGenerator generator, AST... ast) { return unaryOpPre(Opcodes.ISUB, generator, ast); }
+    public static JVMType postIncrement(CodeGenerator generator, AST... ast) { return unaryOpPost(Opcodes.IADD, generator, ast); }
+    public static JVMType postDecrement(CodeGenerator generator, AST... ast) { return unaryOpPost(Opcodes.ISUB, generator, ast); }
 
-    public static void negate(CodeGenerator generator, AST... ast) {
-        generator.apply(ast[1]);
-        generator.useOperator(Opcodes.FNEG);
+    public static JVMType negate(CodeGenerator generator, AST... ast) {
+        JVMType type = generator.applyTypeChecked(ast[1]);
+        generator.useOperator(getOpcode(Opcodes.INEG, type));
+        return type;
     }
 
-    private static void binaryOp(byte opcode, CodeGenerator generator, AST... ast) {
-        generator.apply(ast[0]);
-        generator.apply(ast[2]);
-        generator.useOperator(opcode);
+    private static byte getOpcode(byte opcode, JVMType type) {
+        return (byte) (opcode + switch (type.getDescriptor()) {
+            case "I" -> 0;
+            case "J" -> 1;
+            case "F" -> 2;
+            case "D" -> 3;
+            default -> throw new RuntimeException();
+        });
     }
-    public static void add(CodeGenerator generator, AST... ast) { binaryOp(Opcodes.FADD, generator, ast); }
-    public static void sub(CodeGenerator generator, AST... ast) { binaryOp(Opcodes.FSUB, generator, ast); }
-    public static void mul(CodeGenerator generator, AST... ast) { binaryOp(Opcodes.FMUL, generator, ast); }
-    public static void div(CodeGenerator generator, AST... ast) { binaryOp(Opcodes.FDIV, generator, ast); }
-    public static void rem(CodeGenerator generator, AST... ast) { binaryOp(Opcodes.FREM, generator, ast); }
+    private static JVMType binaryOp(byte opcode, CodeGenerator generator, AST... ast) {
+        JVMType left = generator.applyTypeChecked(ast[0]);
+        JVMType right = generator.applyTypeChecked(ast[2]);
+        if (right != left) generator.convertTop(right, left);
+
+        generator.useOperator(getOpcode(opcode, left));
+        return left;
+    }
+    public static JVMType add(CodeGenerator generator, AST... ast) { return binaryOp(Opcodes.IADD, generator, ast); }
+    public static JVMType sub(CodeGenerator generator, AST... ast) { return binaryOp(Opcodes.ISUB, generator, ast); }
+    public static JVMType mul(CodeGenerator generator, AST... ast) { return binaryOp(Opcodes.IMUL, generator, ast); }
+    public static JVMType div(CodeGenerator generator, AST... ast) { return binaryOp(Opcodes.IDIV, generator, ast); }
+    public static JVMType rem(CodeGenerator generator, AST... ast) { return binaryOp(Opcodes.IREM, generator, ast); }
 
     public static void print(CodeGenerator generator, AST... ast) {
         generator.pushField("java/lang/System", "out", JVMType.refType("java.io.PrintStream"), true);
-        generator.apply(ast[1]);
-        generator.call("java/io/PrintStream", "println", JVMType.VOID, JVMType.FLOAT);
+        JVMType type = generator.applyTypeChecked(ast[1]);
+        generator.call("java/io/PrintStream", "println", JVMType.VOID,
+                type.isPrimitive() ? type : JVMType.refType("java/lang/Object"));
     }
 }

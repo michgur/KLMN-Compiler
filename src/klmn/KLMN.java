@@ -1,15 +1,14 @@
 package klmn;
 
 import codegen.CodeGenerator;
-import jdk.internal.org.objectweb.asm.MethodVisitor;
-import jdk.internal.org.objectweb.asm.Opcodes;
+import jvm.Opcodes;
 import jvm.classes.ClassFile;
-import lexing.Language;
+import lexing.Tokenizer;
 import lexing.TokenStream;
 import parsing.AST;
 import parsing.Parser;
 
-import java.io.IOException;
+import java.util.regex.Pattern;
 
 /**
  * ಠ^ಠ.
@@ -17,8 +16,8 @@ import java.io.IOException;
  */
 public class KLMN implements Opcodes, KLMNSymbols
 {
-    private static Language initialize_language() {
-        Language klmn = new Language();
+    private static Tokenizer initializeTokenizer() {
+        Tokenizer klmn = new Tokenizer();
         klmn.addTerminal(ASSIGN, '=');
         klmn.addTerminal(PLUS, '+');
         klmn.addTerminal(SEMICOLON, ';');
@@ -95,8 +94,8 @@ public class KLMN implements Opcodes, KLMNSymbols
         return klmn;
     }
 
-    public static void compile(String code) {
-        Language klmn = initialize_language();
+    public static ClassFile compile(String code) {
+        Tokenizer klmn = initializeTokenizer();
         TokenStream t = klmn.tokenize(code);
 
         AST ast = new Parser(KLMNSymbols.GRAMMAR).parse(t);
@@ -104,10 +103,6 @@ public class KLMN implements Opcodes, KLMNSymbols
         CodeGenerator writer = CodeGenInit.initialize_codeGenerator(classFile);
         writer.apply(ast);
 
-        try {
-            classFile.run();
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
+        return classFile;
     }
 }

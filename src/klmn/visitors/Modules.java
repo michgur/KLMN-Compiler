@@ -15,10 +15,6 @@ public class Modules
 
     public static void apply(CodeGenerator generator, AST... ast) {
         generator.getSymbolTable().enterScope(SymbolTable.Context.CLASS);
-        generator.getSymbolTable().addType(JVMType.FLOAT);
-        generator.getSymbolTable().addType(JVMType.refType("java/lang/String"));
-        generator.getSymbolTable().addType(JVMType.VOID);
-        generator.getSymbolTable().addType(JVMType.arrayType(JVMType.FLOAT, 1));
         generator.getSymbolTable().enterScope(SymbolTable.Context.BLOCK);
         generator.addMethod("<clinit>", Opcodes.ACC_STATIC | Opcodes.ACC_PUBLIC, JVMType.VOID);
         generator.editMethod("<clinit>");

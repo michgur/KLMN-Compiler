@@ -12,7 +12,6 @@ import java.util.Set;
 
 public class ConstPool implements Opcodes
 {
-
     public static final byte CONSTANT_Class                 = 7;
     public static final byte CONSTANT_Fieldref              = 9;
     public static final byte CONSTANT_Methodref             = 10;
@@ -27,7 +26,7 @@ public class ConstPool implements Opcodes
     public static final byte CONSTANT_MethodHandle          = 15;
     public static final byte CONSTANT_MethodType	        = 16;
     public static final byte CONSTANT_InvokeDynamic         = 18;
-    
+
     public static final byte REF_getField = 1;
     public static final byte REF_getStatic = 2;
     public static final byte REF_putField = 3;
@@ -37,7 +36,7 @@ public class ConstPool implements Opcodes
     public static final byte REF_invokeSpecial = 7;
     public static final byte REF_newInvokeSpecial = 8;
     public static final byte REF_invokeInterface = 9;
-    
+
     private Set<ConstInfo> consts = new LinkedHashSet<>();
     private short count = 1;
 
@@ -66,8 +65,8 @@ public class ConstPool implements Opcodes
     public short addClass(JVMType type) { return addClass(addUtf8(type.getDescriptor())); }
     public short addMethodref(short classIndex, short nameTypeIndex) {
         return addConstInfo(CONSTANT_Methodref, new byte[] {
-            (byte)((classIndex >> 8) & 0xFF), (byte) (classIndex & 0xFF),
-            (byte)((nameTypeIndex >> 8) & 0xFF), (byte) (nameTypeIndex & 0xFF) });
+                (byte)((classIndex >> 8) & 0xFF), (byte) (classIndex & 0xFF),
+                (byte)((nameTypeIndex >> 8) & 0xFF), (byte) (nameTypeIndex & 0xFF) });
     }
     public short addMethodref(String className, String name, String descriptor)
     { return addMethodref(addClass(className), addNameAndType(name, descriptor)); }
@@ -75,7 +74,7 @@ public class ConstPool implements Opcodes
     { return addMethodref(addClass(className), addNameAndType(name, type.getDescriptor())); }
     public short addMethodref(Method method) {
         return addMethodref(method.getDeclaringClass().getName().replace('.', '/'),
-            method.getName(), JVMType.methodDescriptor(method));
+                method.getName(), JVMType.methodDescriptor(method));
     }
     public short addMethodref(Class cls, String method, Class ret, Class... params) {
         return addMethodref(cls.getName().replace('.', '/'),

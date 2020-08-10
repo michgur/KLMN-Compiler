@@ -2,6 +2,8 @@ package lexing;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * ಠ^ಠ.
@@ -9,7 +11,7 @@ import java.util.function.Consumer;
  */
 public class TokenStream implements Iterator<Token>
 {
-    private Language lang;
+    private Tokenizer lang;
 
     private String code;
     private int index, length;
@@ -17,7 +19,7 @@ public class TokenStream implements Iterator<Token>
 
     private Token next = null;
 
-    public TokenStream(Language lang, String code) {
+    public TokenStream(Tokenizer lang, String code) {
         this.lang = lang;
         this.code = code;
 
@@ -50,24 +52,25 @@ public class TokenStream implements Iterator<Token>
         }
         char c = code.charAt(index);
 
-        for (Language.Tokenizer t : lang.ignored) {
-            String ignore = t.read(code, index);
+        for (Tokenizer.Reader reader : lang.ignored) {
+            String ignore = reader.apply(code, index);
             if (ignore == null) continue;
 
             index += ignore.length();
             return next();
         }
-        for (String kw : lang.keywords.keySet())
+        for (String kw : lang.keywords.keySet()) {
             if (code.startsWith(kw, index)) {
                 index += kw.length();
                 return new Token(lang.keywords.get(kw), kw);
             }
-        for (Language.Tokenizer t : lang.others.keySet()) {
-            String value = t.read(code, index);
-            if (value == null) continue;
+        }
+        for (Tokenizer.Reader reader : lang.others.keySet()) {
+            String value = reader.apply(code, index);
+            if (value == null || value.equals("")) continue;
 
             index += value.length();
-            return new Token(lang.others.get(t), value);
+            return new Token(lang.others.get(reader), value);
         }
 
         index++;
