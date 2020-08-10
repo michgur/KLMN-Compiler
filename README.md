@@ -11,6 +11,8 @@
 * **The only limit is your imagination!** (and SLR(1) grammar rules) (and JVM limitations) 
 # How to create a programming language using the KLMN© Compiler Framework:
 _See the klmn package in the source code for a more detailed & complex example_
+
+**In this example we will create a simple programming language that consists of mathematical expressions, and will support the following operators: `+-*/()`. Our compiler will recieve such an expression and will create a `.class` file that calculates the expression and prints the result.**
 ## Step 1: Terminal symbols and Tokenizer
 Terminal Symbols are the 'words' of your language. Let's define some Terminals:
 ```java
@@ -18,6 +20,8 @@ Terminal PLUS = new Terminal("+"); // you can pass a name for each Terminal, for
 Terminal MINUS = new Terminal("-");
 Terminal TIMES = new Terminal("*");
 Terminal DIVIDE = new Terminal("/");
+Terminal PAREN_OPEN = new Terminal("(");
+Terminal PAREN_CLOSE = new Terminal(")");
 Terminal NUMBER = new Terminal("num");
 ```
 Next, we create a Tokenizer. Tokens are parts of the compiled code, and each of them corresponds to a Terminal.
@@ -28,6 +32,7 @@ tokenizer.addTerminal(PLUS, '+'); // a terminal that corresponds to a single cha
 tokenizer.addTerminal(MINUS, '-');
 tokenizer.addTerminal(TIMES, '*');
 tokenizer.addTerminal(DIVIDE, '/');
+tokenizer.addTerminal(PAREN_OPEN, '(').addTerminal(PAREN_CLOSE, ')'); // can chain call
 tokenizer.addTerminal(NUMBER, (src, i) -> {   // a terminal that corresponds to any number in the string
     if (!Character.isDigit(src.charAt(i))) return null;
     StringBuilder result = new StringBuilder().append(src.charAt(i));
@@ -61,6 +66,7 @@ PLUS_EXP.addProduction(TIMES_EXP); // maintain oop
 TIMES_EXP.addProduction(TIMES_EXP, TIMES, VALUE);
 TIMES_EXP.addProduction(TIMES_EXP, DIVIDE, VALUE);
 TIMES_EXP.addProduction(VALUE);
+VALUE.addProduction(PAREN_OPEN, PLUS_EXP, PAREN_CLOSE);
 VALUE.addProduction(NUMBER); // could also be different things like variables and function calls in the future
 
 Grammar grammar = new Grammar(ROOT);
@@ -98,6 +104,7 @@ generator.addVisitor(PLUS_EXP, new Symbol[] { TIMES_EXP }, (g, ast) -> g.apply(a
 generator.addVisitor(PLUS_EXP, new Symbol[] { TIMES_EXP, TIMES, VALUE }, (g, ast) -> binaryOp(Opcodes.FMUL));
 generator.addVisitor(PLUS_EXP, new Symbol[] { TIMES_EXP, DIVIDE, VALUE }, (g, ast) -> binaryOp(Opcodes.FDIV));
 generator.addVisitor(TIMES_EXP, new Symbol[] { VALUE }, (g, ast) -> g.apply(ast[0]));  // for productions with one child, the generator will do this automatically if a visitor is not present. I put this here for clarity.
+generator.addVisitor(VALUE, new Symbol[] { PAREN_OPEN, PLUS_EXP, PAREN_CLOSE }, (g, ast) -> g.apply(ast[1]));
 generator.addVisitor(VALUE, new Symbol[] { NUMBER }, (g, ast) -> g.pushFloat(Float.parseFloat(ast[0].getText())));
 ...
 // helper function to generate arithmetic binary operator code
