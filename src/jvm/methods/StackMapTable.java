@@ -81,9 +81,8 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         current.next.add(target);
         targets.add(target);
         Label next = new Label();
-        Block temp = current;
         assign(next, codePointer);
-        if (isGOTO) temp.next.remove(next);
+        if (isGOTO) targets.add(next);
     }
     
     /* Assign a Label at codePointer */
@@ -99,8 +98,8 @@ public class StackMapTable extends AttributeInfo implements Opcodes
     /* Represents a StackMap Frame */
     private static class Frame
     {
-        private Stack<JVMType> stack = new Stack<>();
-        private List<JVMType> locals = new ArrayList<>();
+        private final Stack<JVMType> stack = new Stack<>();
+        private final List<JVMType> locals = new ArrayList<>();
 
         @Override
         public boolean equals(Object obj) {
@@ -111,17 +110,28 @@ public class StackMapTable extends AttributeInfo implements Opcodes
             for (int i = 0; i < locals.size(); i++) if (!Objects.equals(locals.get(i), f.locals.get(i))) return false;
             return true;
         }
+
+        @Override
+        public String toString() {
+            StringBuilder builder = new StringBuilder("StackMapFrame {\n\tlocals: [");
+            locals.forEach(local -> builder.append(local).append(", "));
+            builder.append("]\n\tstack: [");
+            stack.forEach(item -> builder.append(item).append(", "));
+            return builder.append("]\n}").toString();
+        }
     }
 
     /* Represents a basic-block of code */
-    static class Block implements Comparable {
+    static class Block implements Comparable<Block> {
         private static int index = 0;
         /* Code pointer for block start */
-        private int offset, i;
+        private final int offset, i;
         /* Input and output frames of block */
         private Frame in = new Frame(), out = new Frame();
         // replace next (a set is not required, only two possible branch targets)
-        private Set<Label> next = new HashSet<>();
+        private final Set<Label> next = new HashSet<>();
+        /* Whether the Block is reachable from other blocks / is the first block */
+        private boolean reachable = false;
         public Block(int offset) {
             i = index++;
             this.offset = offset;
@@ -130,11 +140,12 @@ public class StackMapTable extends AttributeInfo implements Opcodes
         }
         public int getOffset() { return offset; }
         /* Used to sort blocks by code location */
-        @Override public int compareTo(Object o) { return Integer.compare(offset, ((Block) o).offset); }
+        @Override public int compareTo(Block b) { return Integer.compare(offset, b.offset); }
         @Override public String toString() { return "block " + i; }
     }
 
     private void updateFrames(Block block, Frame input, Set<Pair<Block, Label>> visited) {
+        block.reachable = true;
         if (input.equals(block.in)) return;
         block.in = merge(block.in, input); // this merge appears to be redundant
         Frame nextInput = merge(block.in, block.out);
@@ -147,26 +158,28 @@ public class StackMapTable extends AttributeInfo implements Opcodes
 
     @Override
     public ByteList toByteList() {
-        info.addShort(targets.size());
-
         updateFrames(first, firstFrame, new HashSet<>());
 
         Block prev = first;
         Set<Block> blocks = new TreeSet<>(); // sorted set (Block implements Comparable)
         targets.forEach(t -> blocks.add(t.block));
+
+        info.addShort(blocks.size());
         for (Block b : blocks) {
+            if (!b.reachable)
+                throw new RuntimeException("unreachable code at @" + b.offset);
             Frame frame = b.in;
             int offsetDelta = b.offset - prev.offset - 1;
 
             if (frame.stack.empty() && frame.locals.equals(prev.in.locals)) {
-                if (offsetDelta < 64) info.addByte(offsetDelta + SAME);
+                if (offsetDelta < 64) info.addByte(SAME + offsetDelta);
                 else {
                     info.addByte(SAME_FRAME_EXTENDED);
                     info.addShort(offsetDelta);
                 }
             }
             else if (frame.stack.size() == 1 && frame.locals.equals(prev.in.locals)) {
-                if (offsetDelta < 64) info.addByte(offsetDelta + SAME_LOCALS_1_STACK_ITEM);
+                if (offsetDelta < 64) info.addByte(SAME_LOCALS_1_STACK_ITEM + offsetDelta);
                 else {
                     info.addByte(SAME_LOCALS_1_STACK_ITEM_EXTENDED);
                     info.addShort(offsetDelta);
@@ -216,13 +229,16 @@ public class StackMapTable extends AttributeInfo implements Opcodes
     }
 
     private void addVarInfo(JVMType type) {
-        if (type.isArrayType()) {
-            info.addByte(ITEM_Object);
-            info.addShort(cls.getConstPool().addClass(type));
-        }
-        else if (type == JVMType.INTEGER) info.addByte(ITEM_Integer);
+        if (type == JVMType.INTEGER) info.addByte(ITEM_Integer);
         else if (type == JVMType.FLOAT) info.addByte(ITEM_Float);
-// fixme handle other ITEMs
+        else if (type == JVMType.LONG) {
+            info.addByte(ITEM_Long);
+            info.addByte(ITEM_Top);
+        }
+        else if (type == JVMType.DOUBLE) {
+            info.addByte(ITEM_Double);
+            info.addByte(ITEM_Top);
+        }
         else {
             info.addByte(ITEM_Object);
             info.addShort(cls.getConstPool().addClass(type));

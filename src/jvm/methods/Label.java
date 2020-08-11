@@ -1,12 +1,16 @@
 package jvm.methods;
 
-public class Label implements Comparable
+public class Label implements Comparable<Label>
 {
     StackMapTable.Block block;
+    private boolean wide = false;
 
     @Override
-    public int compareTo(Object o) {
+    public int compareTo(Label label) {
         return Integer.compare(block.getOffset(),
-                ((Label) o).block.getOffset());
+                label.block.getOffset());
     }
+
+    public boolean isWide() { return wide; }
+    public void setWide(boolean wide) { this.wide = wide; }
 }

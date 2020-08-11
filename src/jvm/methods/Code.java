@@ -10,10 +10,12 @@ import java.util.*;
 
 public class Code extends AttributeInfo implements Opcodes
 {
+    /* The code item of this attribute  */
     private final ByteList code = new ByteList();
     private final List<AttributeInfo> attributes = new ArrayList<>();
     private final StackMapTable smt;
-    private final Map<Label, Set<Integer>> frames = new HashMap<>();
+    /* Map Labels to their occurrences in data */
+    private final Map<Label, Set<Integer>> frameRefs = new HashMap<>();
 
     Code(ClassFile cls, MethodInfo method) {
         super(cls, "Code");
@@ -110,13 +112,17 @@ public class Code extends AttributeInfo implements Opcodes
         if (operands > 0) smt.pop(operands);
         int i = code.size();
         code.addByte(opcode);
-        frames.putIfAbsent(target, new HashSet<>());
-        frames.get(target).add(i + 1);
-        code.addShort(0x0000);
-        smt.jmp(target, i, opcode == GOTO);
+        frameRefs.putIfAbsent(target, new HashSet<>());
+        frameRefs.get(target).add(i + 1);
+        if (opcode == GOTO_W) {
+            code.addInt(0x00000000);
+            smt.jmp(target, i + 5, true);
+            target.setWide(true);
+        } else {
+            code.addShort(0x0000);
+            smt.jmp(target, i + 3, opcode == GOTO);
+        }
     }
-
-    public void chop(int amt) {}
 
     public Label assign(Label label) {
         smt.assign(label, code.size());
@@ -125,11 +131,15 @@ public class Code extends AttributeInfo implements Opcodes
 
     @Override
     public ByteList toByteList() {
-        for (Label frame : frames.keySet())
-            for (int pair : frames.get(frame)) {
-                int offset = frame.block.getOffset() - pair + 1;
-                code.set(pair, (byte) (offset >> 8 & 0xFF));
-                code.set(pair + 1, (byte) (offset & 0xFF));
+        for (Label frame : frameRefs.keySet())
+            for (int ref : frameRefs.get(frame)) {
+                int offset = frame.block.getOffset() - ref + 1;
+                if (frame.isWide()) {
+                    code.set(ref++, (byte) (offset >> 24 & 0xFF));
+                    code.set(ref++, (byte) (offset >> 16 & 0xFF));
+                }
+                code.set(ref++, (byte) (offset >> 8 & 0xFF));
+                code.set(ref, (byte) (offset & 0xFF));
             }
 
         info.addShort(smt.getMaxStack());       // max_stack

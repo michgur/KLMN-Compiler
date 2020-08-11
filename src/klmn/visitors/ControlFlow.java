@@ -41,6 +41,11 @@ public class ControlFlow
     public static void equals(CodeGenerator generator, AST... ast) { condition(Opcodes.IFEQ, generator, ast); }
     public static void notEquals(CodeGenerator generator, AST... ast) { condition(Opcodes.IFNE, generator, ast); }
 
+    public static void trueCondition(CodeGenerator generator, AST... ast)
+    { if (!invert) generator.useJmpOperator(Opcodes.GOTO, target); }
+    public static void falseCondition(CodeGenerator generator, AST... ast)
+    { if (invert) generator.useJmpOperator(Opcodes.GOTO, target); }
+
     public static void and(CodeGenerator generator, AST... ast) {
         // if any of the branches are FALSE, skip to target.
         generator.apply(ast[0]);
