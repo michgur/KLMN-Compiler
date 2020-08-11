@@ -49,6 +49,11 @@ tokenizer.addTerminal(NUMBER, (src, i) -> {   // a terminal that corresponds to 
     }
     return result.toString();
 });
+tokenizer.ignore((src, i) -> { // ignore whitespace
+    char c = src.charAt(i);
+    if (c == ' ' || c == '\n' || c == '\t' || c == '\r') return c + "";
+    return null;
+});
 ```
 Now the Tokenizer is able to take a String and convert it to a TokenStream.
 ```java
