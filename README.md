@@ -80,7 +80,7 @@ VALUE.addProduction(NUMBER); // could also be different things like variables an
 
 Grammar grammar = new Grammar(ROOT);
 ```
-Now we can create a parser for out grammar, and parse the TokenStream to get an AST (abstract syntax tree), a tree representation of the structure of our code:
+Now we can create a parser for our grammar, and parse the TokenStream to get an AST (abstract syntax tree), a tree representation of the structure of our code:
 ```java
 Parser parser = new Parser(grammar);
 AST ast = parser.parse(stream);
