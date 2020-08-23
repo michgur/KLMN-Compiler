@@ -86,7 +86,7 @@ Parser parser = new Parser(grammar);
 AST ast = parser.parse(stream);
 ```
 ## Step 3: JVM bytecode generation
-After we have an AST, it's much easier to compile the code. Here we will use the CodeGenerator class which provides many utilities for generating bytecode, but theoretically you could use the AST to compile to different platforms.
+After we have an AST, it's much easier to compile the code. Here we will use the CodeGenerator class which provides many utilities for generating JVM bytecode, but theoretically you could use the AST to compile to different platforms.
 
 First, we need to create a target ClassFile, and pass it to our new CodeGenerator:
 ```java
